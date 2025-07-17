@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StoreCalendar
+
+Turn your Shopify products into social media gold with AI-generated captions.
+
+## Features
+
+- **Shopify Integration**: Paste any Shopify store URL to get started
+- **7 Caption Styles**: Product showcase, benefits-focused, social proof, how-to-style, problem/solution, behind-the-scenes, call-to-action
+- **Progressive Email Collection**: Preview 3 captions, then unlock all 7 with email
+- **Customizable Generation**: Select which caption styles you want
+- **CSV Export**: Download all captions for easy scheduling
+- **Rate Limiting**: Built-in protection with configurable limits
+
+## Tech Stack
+
+- **Frontend**: Next.js 15, TypeScript, Tailwind CSS
+- **Backend**: Next.js API routes
+- **Database**: Supabase (PostgreSQL)
+- **AI**: OpenAI GPT-4o
+- **Deployment**: Vercel
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables (see `.env.example`)
+4. Run database migrations in Supabase
+5. Start development server: `npm run dev`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Environment Variables
+
+```
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+RATE_LIMIT_PER_IP=10
+RATE_LIMIT_TOTAL=100
+JWT_SECRET=your_jwt_secret
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create these tables in your Supabase dashboard:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `calendar_stores` - Store information
+- `calendar_products` - Product data
+- `calendar_captions` - Generated captions
+- `calendar_rate_limits` - Rate limiting
+- `calendar_daily_stats` - Usage statistics
+- `calendar_emails` - Email collection
 
-## Learn More
+See `src/lib/supabase.ts` for complete schema.
 
-To learn more about Next.js, take a look at the following resources:
+## API Endpoints
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `POST /api/generate` - Generate captions for Shopify store
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

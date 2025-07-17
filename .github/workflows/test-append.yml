@@ -1,0 +1,30 @@
+name: Append Random Number to Test File
+
+permissions:
+  contents: write
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  append-number:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Append random 2-digit number to test file
+        run: |
+          echo $((RANDOM % 90 + 10)) >> test
+
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }} # Replace with your own token if needed
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add test
+          git commit -m "Append random 2-digit number to test file [skip ci]" || echo "No changes to commit"
+          git push
