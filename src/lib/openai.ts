@@ -171,12 +171,12 @@ Return only the JSON, no additional text or formatting.
   return results;
 }
 
-export async function generatePreviewCaptions(
+export async function generateAllCaptions(
   products: ShopifyProduct[],
   storeName: string,
   storeId?: string
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
-  // Generate only first 3 caption styles for preview
-  const previewStyles: CaptionStyle[] = ['product_showcase', 'benefits_focused', 'social_proof'];
-  return generateCaptions(products.slice(0, 1), storeName, previewStyles, storeId); // Only first product, first 3 styles
+  // Generate ALL 7 caption styles upfront
+  const allStyles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[];
+  return generateCaptions(products.slice(0, 1), storeName, allStyles, storeId); // Only first product, ALL 7 styles
 }

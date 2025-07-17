@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
-import { generatePreviewCaptions, generateCaptions } from '@/lib/openai';
+import { generateAllCaptions } from '@/lib/openai';
 import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
 import { GenerationResponse } from '@/types';
@@ -8,7 +8,7 @@ import { GenerationResponse } from '@/types';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { shopify_url, email, selected_styles, force_refresh } = body;
+    const { shopify_url, email, force_refresh } = body;
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -189,22 +189,14 @@ export async function POST(request: NextRequest) {
       productData = existingProductData;
     }
     
-    // Generate captions based on email presence and selected styles
+    // Generate ALL 7 captions upfront (no email needed initially)
     let captionResults;
-    let requiresEmail = false;
     
     if (!email) {
-      // No email - show preview (first 3 captions)
-      captionResults = await generatePreviewCaptions(products, storeName, storeData.id);
-      requiresEmail = true;
+      // No email - generate all captions but mark as preview
+      captionResults = await generateAllCaptions(products, storeName, storeData.id);
     } else {
-      // Email provided - generate selected styles or all 7
-      const stylesToGenerate = selected_styles && selected_styles.length > 0 
-        ? selected_styles 
-        : undefined; // undefined = all styles
-      
-      captionResults = await generateCaptions(products, storeName, stylesToGenerate, storeData.id);
-      
+      // Email provided - just return success (captions already generated)
       // Store email
       await supabase
         .from('calendar_emails')
@@ -214,6 +206,13 @@ export async function POST(request: NextRequest) {
         }, {
           onConflict: 'email,store_id'
         });
+      
+      // Return success with email stored flag
+      return NextResponse.json({
+        success: true,
+        email_stored: true,
+        message: 'Email stored successfully'
+      });
     }
     
     // Store generated captions
@@ -244,7 +243,7 @@ export async function POST(request: NextRequest) {
       success: true,
       store_name: storeName,
       products,
-      [requiresEmail ? 'preview_captions' : 'captions']: captionResults.flatMap(result => 
+      all_captions: captionResults.flatMap(result => 
         result.captions.map(caption => ({
           id: '', // Will be filled from DB if needed
           product_id: result.product.id,
@@ -253,7 +252,7 @@ export async function POST(request: NextRequest) {
           created_at: new Date().toISOString()
         }))
       ),
-      requires_email: requiresEmail
+      requires_email: true // Always true initially, UI will handle preview vs full
     };
     
     return NextResponse.json(response);

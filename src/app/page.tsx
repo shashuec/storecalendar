@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GenerationResponse, CaptionStyle, ShopifyProduct } from '@/types';
+import { GenerationResponse, CaptionStyle, ShopifyProduct, Caption } from '@/types';
 import { CAPTION_STYLES, getDefaultSelectedStyles } from '@/lib/caption-styles';
 
 export default function HomePage() {
@@ -16,8 +16,11 @@ export default function HomePage() {
   const [selectedStyles, setSelectedStyles] = useState<CaptionStyle[]>(getDefaultSelectedStyles());
   const [showStyleSelection, setShowStyleSelection] = useState(false);
   const [showAllCaptionsForm, setShowAllCaptionsForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [showFullCaptions, setShowFullCaptions] = useState(false); // Show all 7 vs just 3 preview
+  const [allCaptions, setAllCaptions] = useState<Caption[]>([]); // Store all generated captions
 
   // Auto-select first product when results come back
   useEffect(() => {
@@ -25,6 +28,23 @@ export default function HomePage() {
       setSelectedProduct(result.products[0]);
     }
   }, [result?.products, selectedProduct]);
+
+  // Show email form when user changes product or clicks view all
+  const handleProductChange = (productId: string) => {
+    const product = result?.products?.find(p => p.id === productId);
+    if (product) {
+      setSelectedProduct(product);
+      // Show email form if user selects a different product than the first one
+      if (result?.products && product.id !== result.products[0]?.id) {
+        setShowEmailForm(true);
+      }
+    }
+  };
+
+  const handleViewAllStyles = () => {
+    setShowAllCaptionsForm(true);
+    setShowEmailForm(true);
+  };
 
   const handleGenerate = async (withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
@@ -57,7 +77,21 @@ export default function HomePage() {
         throw new Error(data.error || 'Failed to generate captions');
       }
 
-      setResult(data);
+      if (data.all_captions) {
+        // Store all captions and show first 3 as preview
+        setAllCaptions(data.all_captions);
+        setResult({
+          ...data,
+          preview_captions: data.all_captions.slice(0, 3)
+        });
+      } else if (data.email_stored) {
+        // Email was stored successfully - show all captions
+        setShowFullCaptions(true);
+        setShowEmailForm(false);
+      } else {
+        setResult(data);
+      }
+      
       // Auto-select first product if no product is selected
       if (!selectedProduct && data.products && data.products.length > 0) {
         setSelectedProduct(data.products[0]);
@@ -69,12 +103,38 @@ export default function HomePage() {
     }
   };
 
-  const handleEmailSubmit = () => {
+  const handleEmailSubmit = async () => {
     if (!email.trim()) {
       setError('Please enter your email address');
       return;
     }
-    handleGenerate(true);
+    
+    setLoading(true);
+    try {
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopify_url: url,
+          email: email.trim()
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.email_stored) {
+        // Email stored successfully - show all captions
+        setShowFullCaptions(true);
+        setShowEmailForm(false);
+        setError('');
+      } else {
+        setError(data.error || 'Failed to store email');
+      }
+    } catch {
+      setError('Failed to submit email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStyleToggle = (styleId: CaptionStyle) => {
@@ -126,6 +186,9 @@ export default function HomePage() {
     setSelectedStyles(getDefaultSelectedStyles());
     setShowStyleSelection(false);
     setShowAllCaptionsForm(false);
+    setShowEmailForm(false);
+    setShowFullCaptions(false);
+    setAllCaptions([]);
     setSelectedProduct(null);
     setCopiedCaption(null);
   };
@@ -238,125 +301,73 @@ export default function HomePage() {
                     </h3>
                   </div>
 
-                  {/* View All Captions Button */}
-                  {result.requires_email && !showAllCaptionsForm && (
-                    <div className="mb-6 text-center">
-                      <Button
-                        onClick={() => {
-                          setShowAllCaptionsForm(true);
-                          setShowStyleSelection(true);
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-12 px-6 rounded-lg transition-colors"
+                  {/* Product and Style Selection - Always Visible */}
+                  <div className="mb-6">
+                    {/* Product Selection */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Product:</label>
+                      <select 
+                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
+                        value={selectedProduct?.id || ''}
+                        onChange={(e) => handleProductChange(e.target.value)}
                       >
-                        📧 View All 7 Caption Styles + CSV Export
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Email Collection Form */}
-                  {showAllCaptionsForm && (
-                    <div className="mb-6">
-                        {/* Product Selection */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Product:</label>
-                          <select 
-                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
-                            value={selectedProduct?.id || ''}
-                            onChange={(e) => {
-                              const productId = e.target.value;
-                              const product = result.products?.find(p => p.id === productId);
-                              if (product) {
-                                setSelectedProduct(product);
-                              }
-                            }}
-                          >
-                            <option value="">Select a product...</option>
-                            {result.products?.map(product => (
-                              <option key={product.id} value={product.id}>
-                                {product.name} - ${product.price}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      
-                        {/* Style Selection */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Caption Styles:</label>
-                          <select 
-                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
-                            value={`${selectedStyles.length} selected`}
-                            onChange={() => setShowStyleSelection(!showStyleSelection)}
-                          >
-                            <option value={`${selectedStyles.length} selected`}>
-                              {selectedStyles.length} caption styles selected
-                            </option>
-                          </select>
+                        <option value="">Select a product...</option>
+                        {result.products?.map(product => {
+                          // Detect currency from price string
+                          const currency = product.price.includes('₹') ? '₹' : 
+                                         product.price.includes('$') ? '$' : 
+                                         product.price.includes('€') ? '€' : 
+                                         product.price.includes('£') ? '£' : '';
+                          const cleanPrice = product.price.replace(/[₹$€£]/g, '');
                           
-                          {showStyleSelection && (
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border">
-                              {CAPTION_STYLES.map((style) => (
-                                <div key={style.id} className="space-y-1">
-                                  <Checkbox
-                                    id={style.id}
-                                    checked={selectedStyles.includes(style.id)}
-                                    onChange={() => handleStyleToggle(style.id)}
-                                    label={`${style.emoji} ${style.name}`}
-                                  />
-                                  <p className="text-xs text-gray-600 ml-6">{style.description}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Email Input */}
-                        <div className="space-y-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Email Address:</label>
-                          <Input
-                            type="email"
-                            placeholder="your@email.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-white border border-gray-300 text-gray-900 placeholder:text-gray-500 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
-                            disabled={loading}
-                          />
-                        </div>
-                        
-                        <Button
-                          onClick={handleEmailSubmit}
-                          disabled={loading || !email.trim() || selectedStyles.length === 0 || !selectedProduct}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {loading ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Generating...
-                            </div>
-                          ) : (
-                            `Generate ${selectedStyles.length} Styles for ${selectedProduct?.name || 'Selected Product'}`
-                          )}
-                        </Button>
-                        
-                        {selectedStyles.length === 0 && (
-                          <p className="text-red-600 text-sm mt-2">Please select at least one caption style</p>
-                        )}
-                        {!selectedProduct && (
-                          <p className="text-amber-600 text-sm mt-2">Please select a product to generate captions for</p>
-                        )}
-                      </div>
+                          return (
+                            <option key={product.id} value={product.id}>
+                              {product.name} - {currency}{cleanPrice}
+                            </option>
+                          );
+                        })}
+                      </select>
                     </div>
-                  )}
+                  
+                    {/* Style Selection */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Caption Styles:</label>
+                      <div 
+                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
+                        onClick={() => setShowStyleSelection(!showStyleSelection)}
+                      >
+                        <span>{selectedStyles.length} caption styles selected</span>
+                        <span className="text-gray-400">{showStyleSelection ? '▲' : '▼'}</span>
+                      </div>
+                      
+                      {showStyleSelection && (
+                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border">
+                          {CAPTION_STYLES.map((style) => (
+                            <div key={style.id} className="space-y-1">
+                              <Checkbox
+                                id={style.id}
+                                checked={selectedStyles.includes(style.id)}
+                                onChange={() => handleStyleToggle(style.id)}
+                                label={`${style.emoji} ${style.name}`}
+                              />
+                              <p className="text-xs text-gray-600 ml-6">{style.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
 
                   {/* Captions Display */}
-                  {(result.preview_captions || result.captions || []).length > 0 && (
+                  {((showFullCaptions ? allCaptions : result.preview_captions) || result.captions || []).length > 0 && (
                     <div className="space-y-3">
                       <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
-                    {(result.preview_captions || result.captions || []).map((caption, index) => {
+                    {(showFullCaptions ? allCaptions : (result.preview_captions || result.captions || [])).map((caption, index) => {
                       const styleInfo = CAPTION_STYLES.find(s => s.id === caption.caption_style);
                       const styleDisplay = caption.caption_style
                         .replace(/_/g, ' ')
-                        .replace(/\b\w/g, l => l.toUpperCase());
+                        .replace(/\b\w/g, (l: string) => l.toUpperCase());
 
                       return (
                         <div key={index} className="bg-gray-50 rounded-lg border border-gray-200 p-3">
@@ -403,14 +414,42 @@ export default function HomePage() {
                         Export to CSV
                       </Button>
                     )}
-                    <Button
-                      onClick={resetForm}
-                      variant="outline"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                    >
-                      Try Another Store
-                    </Button>
                   </div>
+                  
+                  {/* View All 7 Styles Button - only for preview captions */}
+                  {result.preview_captions && result.preview_captions.length > 0 && !showFullCaptions && (
+                    <div className="mt-4">
+                      <div className="text-center">
+                        <Button
+                          onClick={handleViewAllStyles}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors"
+                        >
+                          View All 7 Caption Styles
+                        </Button>
+                      </div>
+                      
+                      {/* Email Form - simple inline */}
+                      {showEmailForm && (
+                        <div className="mt-3 space-y-2">
+                          <Input
+                            type="email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full h-9 px-3 text-sm"
+                            disabled={loading}
+                          />
+                          <Button
+                            onClick={handleEmailSubmit}
+                            disabled={loading || !email.trim() || selectedStyles.length === 0 || !selectedProduct}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm"
+                          >
+                            {loading ? 'Generating...' : `Generate All Styles`}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -440,7 +479,7 @@ export default function HomePage() {
                           <span>⭐</span>
                           <strong className="text-yellow-300">Social Proof</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Join 1000+ happy customers.&rdquo;</p>
+                        <p className="text-white/90">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Absolutely love it!&rdquo;</p>
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -475,8 +514,8 @@ export default function HomePage() {
             <div className="relative max-w-6xl mx-auto">
               <div className="grid md:grid-cols-4 gap-8 text-center">
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">1000+</div>
-                  <div className="text-white/70 text-sm">Shopify Stores</div>
+                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">AI</div>
+                  <div className="text-white/70 text-sm">Powered</div>
                 </div>
                 <div className="group">
                   <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">50K+</div>
@@ -669,7 +708,7 @@ export default function HomePage() {
                         <p className="text-white/60 text-sm">Build trust & credibility</p>
                       </div>
                     </div>
-                    <p className="text-white/80 text-sm italic mb-3">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Join 1000+ happy customers.&rdquo;</p>
+                    <p className="text-white/80 text-sm italic mb-3">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Absolutely love it!&rdquo;</p>
                     <div className="text-xs text-white/50">Best for: Trust building, testimonials</div>
                   </div>
                 </div>

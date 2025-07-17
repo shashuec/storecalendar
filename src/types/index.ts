@@ -43,6 +43,9 @@ export interface GenerationResponse {
   products?: ShopifyProduct[];
   captions?: Caption[];
   preview_captions?: Caption[]; // First 3 captions
+  all_captions?: Caption[]; // All 7 captions generated upfront
   error?: string;
   requires_email?: boolean;
+  email_stored?: boolean; // Flag when email is successfully stored
+  message?: string;
 }
