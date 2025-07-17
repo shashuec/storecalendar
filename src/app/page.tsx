@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -36,7 +35,7 @@ export default function HomePage() {
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Paste your Shopify store URL and get 7 different caption styles for your products. 
-            No more writer's block. No more boring posts.
+            No more writer&apos;s block. No more boring posts.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -61,21 +60,21 @@ export default function HomePage() {
                       <span>✨</span>
                       <strong className="text-indigo-600">Product Showcase</strong>
                     </div>
-                    "New arrival alert! 🌟 Our organic cotton tee in forest green is here. Soft, sustainable, perfect for any season."
+                    &ldquo;New arrival alert! 🌟 Our organic cotton tee in forest green is here. Soft, sustainable, perfect for any season.&rdquo;
                   </div>
                   <div className="p-3 bg-gray-50 rounded text-sm border-l-4 border-green-400">
                     <div className="flex items-center gap-2 mb-1">
                       <span>🎯</span>
                       <strong className="text-green-600">Benefits-Focused</strong>
                     </div>
-                    "Why choose organic cotton? Breathable, hypoallergenic, and eco-friendly. Your skin will thank you."
+                    &ldquo;Why choose organic cotton? Breathable, hypoallergenic, and eco-friendly. Your skin will thank you.&rdquo;
                   </div>
                   <div className="p-3 bg-gray-50 rounded text-sm border-l-4 border-yellow-400">
                     <div className="flex items-center gap-2 mb-1">
                       <span>⭐</span>
                       <strong className="text-yellow-600">Social Proof</strong>
                     </div>
-                    "⭐⭐⭐⭐⭐ 'Best t-shirt I've ever owned!' - Sarah M. Join 1000+ happy customers."
+                    &ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Join 1000+ happy customers.&rdquo;
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -84,14 +83,14 @@ export default function HomePage() {
                       <span>👕</span>
                       <strong className="text-purple-600">How-to-Style</strong>
                     </div>
-                    "Style tip: Pair with high-waisted jeans and sneakers for the perfect casual look."
+                    &ldquo;Style tip: Pair with high-waisted jeans and sneakers for the perfect casual look.&rdquo;
                   </div>
                   <div className="p-3 bg-gray-50 rounded text-sm border-l-4 border-orange-400">
                     <div className="flex items-center gap-2 mb-1">
                       <span>🔥</span>
                       <strong className="text-orange-600">Call-to-Action</strong>
                     </div>
-                    "Limited stock alert! Only 15 left in your size. Don't miss out on ultimate comfort."
+                    &ldquo;Limited stock alert! Only 15 left in your size. Don&apos;t miss out on ultimate comfort.&rdquo;
                   </div>
                   <div className="text-center text-gray-400 text-sm p-3">
                     + 2 more caption styles<br/>

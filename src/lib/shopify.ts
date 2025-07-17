@@ -26,7 +26,13 @@ export async function scrapeShopifyStore(url: string): Promise<{
     const storeName = cleanUrl.split('.')[0] || 'Store';
     
     // Transform products
-    const products: ShopifyProduct[] = productsData.products.slice(0, 10).map((product: any) => ({
+    const products: ShopifyProduct[] = productsData.products.slice(0, 10).map((product: {
+      id: number;
+      title: string;
+      body_html?: string;
+      variants: Array<{ price: string }>;
+      images: Array<{ src: string }>;
+    }) => ({
       id: product.id.toString(),
       name: product.title,
       description: product.body_html?.replace(/<[^>]*>/g, '').substring(0, 200) || '',

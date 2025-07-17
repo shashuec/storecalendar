@@ -7,7 +7,6 @@ export async function checkRateLimit(ipAddress: string): Promise<{
 }> {
   try {
     const perIpLimit = parseInt(process.env.RATE_LIMIT_PER_IP || '10');
-    const totalLimit = parseInt(process.env.RATE_LIMIT_TOTAL || '100');
     
     // Check IP-specific rate limit
     const { data: ipData, error: ipError } = await supabase

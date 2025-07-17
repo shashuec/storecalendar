@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
-import { GenerationResponse, Caption, CaptionStyle } from '@/types';
+import { GenerationResponse, CaptionStyle } from '@/types';
 import { CAPTION_STYLES, getDefaultSelectedStyles } from '@/lib/caption-styles';
 
 export default function GeneratePage() {
@@ -199,7 +199,7 @@ export default function GeneratePage() {
                           />
                           <p className="text-xs text-gray-600 ml-6">{style.description}</p>
                           <div className="text-xs text-gray-500 ml-6 p-2 bg-gray-50 rounded italic">
-                            "{style.example}"
+                            &ldquo;{style.example}&rdquo;
                           </div>
                         </div>
                       ))}
