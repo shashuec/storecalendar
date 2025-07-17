@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     
     if (!email) {
       // No email - show preview (first 3 captions)
-      captionResults = await generatePreviewCaptions(products, storeName);
+      captionResults = await generatePreviewCaptions(products, storeName, storeData.id);
       requiresEmail = true;
     } else {
       // Email provided - generate selected styles or all 7
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         ? selected_styles 
         : undefined; // undefined = all styles
       
-      captionResults = await generateCaptions(products, storeName, stylesToGenerate);
+      captionResults = await generateCaptions(products, storeName, stylesToGenerate, storeData.id);
       
       // Store email
       await supabase

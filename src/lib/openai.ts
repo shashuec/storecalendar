@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { ShopifyProduct, CaptionStyle } from '@/types';
+import { supabase } from './supabase';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,10 +16,43 @@ const CAPTION_STYLES: Record<CaptionStyle, string> = {
   call_to_action: 'Create urgency and drive immediate action. Use strong CTAs and scarcity/urgency elements.'
 };
 
+async function logOpenAIRequest(
+  storeId: string,
+  productId: string,
+  style: CaptionStyle,
+  prompt: string,
+  response: string | null,
+  model: string,
+  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null,
+  responseTime: number,
+  success: boolean,
+  error?: string
+) {
+  try {
+    await supabase.from('calendar_openai_logs').insert({
+      store_id: storeId,
+      product_id: productId,
+      caption_style: style,
+      request_prompt: prompt,
+      response_text: response,
+      model_used: model,
+      prompt_tokens: usage?.prompt_tokens || 0,
+      completion_tokens: usage?.completion_tokens || 0,
+      total_tokens: usage?.total_tokens || 0,
+      response_time_ms: responseTime,
+      success,
+      error_message: error
+    });
+  } catch (logError) {
+    console.error('Failed to log OpenAI request:', logError);
+  }
+}
+
 export async function generateCaptions(
   products: ShopifyProduct[],
   storeName: string,
-  styles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[]
+  styles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[],
+  storeId?: string
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   
   const results = [];
@@ -27,6 +61,11 @@ export async function generateCaptions(
     const productCaptions = [];
     
     for (const style of styles) {
+      const startTime = Date.now();
+      let success = false;
+      let captionText = '';
+      let error: string | undefined;
+      
       try {
         const prompt = `
 You are a social media expert creating content for "${storeName}".
@@ -54,16 +93,55 @@ Return only the caption text, no additional formatting or explanations.
           temperature: 0.7,
         });
 
-        const captionText = completion.choices[0]?.message?.content?.trim() || '';
+        captionText = completion.choices[0]?.message?.content?.trim() || '';
+        const responseTime = Date.now() - startTime;
         
         if (captionText) {
           productCaptions.push({
             style,
             text: captionText
           });
+          success = true;
         }
-      } catch (error) {
-        console.error(`Error generating ${style} caption for ${product.name}:`, error);
+
+        // Log the request
+        if (storeId) {
+          await logOpenAIRequest(
+            storeId,
+            product.id,
+            style,
+            prompt,
+            captionText,
+            process.env.OPENAI_MODEL || 'gpt-4o',
+            completion.usage,
+            responseTime,
+            success,
+            error
+          );
+        }
+        
+      } catch (err) {
+        error = err instanceof Error ? err.message : 'Unknown error';
+        const responseTime = Date.now() - startTime;
+        
+        console.error(`Error generating ${style} caption for ${product.name}:`, err);
+        
+        // Log the failed request
+        if (storeId) {
+          await logOpenAIRequest(
+            storeId,
+            product.id,
+            style,
+            `Error occurred during generation`,
+            null,
+            process.env.OPENAI_MODEL || 'gpt-4o',
+            null,
+            responseTime,
+            false,
+            error
+          );
+        }
+        
         // Continue with other captions even if one fails
       }
     }
@@ -81,9 +159,10 @@ Return only the caption text, no additional formatting or explanations.
 
 export async function generatePreviewCaptions(
   products: ShopifyProduct[],
-  storeName: string
+  storeName: string,
+  storeId?: string
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   // Generate only first 3 caption styles for preview
   const previewStyles: CaptionStyle[] = ['product_showcase', 'benefits_focused', 'social_proof'];
-  return generateCaptions(products.slice(0, 1), storeName, previewStyles); // Only first product, first 3 styles
+  return generateCaptions(products.slice(0, 1), storeName, previewStyles, storeId); // Only first product, first 3 styles
 }

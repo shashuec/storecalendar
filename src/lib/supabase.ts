@@ -61,6 +61,24 @@ export const createTables = async () => {
       store_id UUID REFERENCES calendar_stores(id) ON DELETE CASCADE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
+
+    -- OpenAI logs table (for debugging and cost tracking)
+    CREATE TABLE IF NOT EXISTS calendar_openai_logs (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      store_id UUID REFERENCES calendar_stores(id) ON DELETE CASCADE,
+      product_id UUID REFERENCES calendar_products(id) ON DELETE CASCADE,
+      caption_style TEXT NOT NULL,
+      request_prompt TEXT NOT NULL,
+      response_text TEXT,
+      model_used TEXT NOT NULL,
+      prompt_tokens INTEGER,
+      completion_tokens INTEGER,
+      total_tokens INTEGER,
+      response_time_ms INTEGER,
+      success BOOLEAN DEFAULT true,
+      error_message TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
   `;
   
   console.log('Run these queries in Supabase dashboard:', queries);
