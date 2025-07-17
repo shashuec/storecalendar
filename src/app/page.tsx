@@ -30,12 +30,42 @@ export default function HomePage() {
   }, [result?.products, selectedProduct]);
 
   // Show email form when user changes product or clicks view all
-  const handleProductChange = (productId: string) => {
+  const handleProductChange = async (productId: string) => {
     const product = result?.products?.find(p => p.id === productId);
     if (product) {
       setSelectedProduct(product);
-      // Show email form if user selects a different product than the first one
-      if (result?.products && product.id !== result.products[0]?.id) {
+      
+      // Generate new captions for the selected product
+      if (productId !== result?.products?.[0]?.id) {
+        setLoading(true);
+        try {
+          const response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              shopify_url: url,
+              selected_product_id: productId
+            }),
+          });
+
+          const data: GenerationResponse = await response.json();
+
+          if (response.ok && data.all_captions) {
+            // Update captions for the new product
+            setAllCaptions(data.all_captions);
+            setResult(prev => prev ? {
+              ...prev,
+              preview_captions: data.all_captions?.slice(0, 3) || []
+            } : null);
+          }
+        } catch (err) {
+          console.error('Error generating captions for selected product:', err);
+        } finally {
+          setLoading(false);
+        }
+        
         setShowEmailForm(true);
       }
     }
@@ -172,13 +202,17 @@ export default function HomePage() {
   };
 
   const exportToCSV = () => {
-    if (!result?.captions && !result?.preview_captions) return;
+    // Get the appropriate captions based on current state
+    const captionsToExport = showFullCaptions 
+      ? allCaptions 
+      : (result?.captions || result?.preview_captions || []);
     
-    const captions = result.captions || result.preview_captions || [];
+    if (captionsToExport.length === 0) return;
+    
     const csvContent = [
       ['Product', 'Caption Style', 'Caption Text'],
-      ...captions.map(caption => [
-        result.products?.find(p => p.id === caption.product_id)?.name || 'Product',
+      ...captionsToExport.map(caption => [
+        result?.products?.find(p => p.id === caption.product_id)?.name || 'Product',
         caption.caption_style.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
         caption.caption_text
       ])
@@ -188,7 +222,7 @@ export default function HomePage() {
     const downloadUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = downloadUrl;
-    a.download = `${result.store_name || 'store'}-captions.csv`;
+    a.download = `${result?.store_name || 'store'}-captions.csv`;
     a.click();
     window.URL.revokeObjectURL(downloadUrl);
   };
@@ -374,14 +408,19 @@ export default function HomePage() {
 
                   </div>
 
-                  {/* Captions Display */}
-                  {(() => {
-                    const captionsToShow = showFullCaptions ? allCaptions : (result.preview_captions || result.captions || []);
-                    console.log('Captions to show:', captionsToShow, 'showFullCaptions:', showFullCaptions, 'allCaptions:', allCaptions, 'preview_captions:', result.preview_captions);
-                    return captionsToShow.length > 0 ? (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
-                        {captionsToShow.map((caption, index) => {
+                 {/* Captions Display */}
+                  {((showFullCaptions ? allCaptions : result.preview_captions) || result.captions || []).length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-900 mb-3">
+                        Generated Captions:
+                        {loading && (
+                          <span className="ml-2 text-sm text-blue-600">
+                            <div className="inline-block w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                            Updating...
+                          </span>
+                        )}
+                      </h4>
+                    {(showFullCaptions ? allCaptions : (result.preview_captions || result.captions || [])).map((caption, index) => {
                       const styleInfo = CAPTION_STYLES.find(s => s.id === caption.caption_style);
                       const styleDisplay = caption.caption_style
                         .replace(/_/g, ' ')
@@ -418,19 +457,18 @@ export default function HomePage() {
                         </div>
                       );
                     })}
-                      </div>
-                    ) : null;
-                  })()}
+                    </div>
+                  )}
 
                   {/* Action Buttons */}
                   <div className="mt-6 flex justify-center gap-3">
-                    {result.captions && (
+                    {((showFullCaptions ? allCaptions : result.preview_captions) || result.captions || []).length > 0 && (
                       <Button
                         onClick={exportToCSV}
                         variant="outline"
                         className="border-gray-300 text-gray-700 hover:bg-gray-50"
                       >
-                        Export to CSV
+                        📥 Export to CSV
                       </Button>
                     )}
                   </div>

@@ -8,7 +8,7 @@ import { GenerationResponse } from '@/types';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { shopify_url, email, force_refresh } = body;
+    const { shopify_url, email, force_refresh, selected_product_id } = body;
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if we have cached data (within 6 hours)
-    const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./, '');
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     
     // Try to get existing store data
@@ -194,8 +194,14 @@ export async function POST(request: NextRequest) {
     
     if (!email) {
       // No email - generate all captions but mark as preview
-      captionResults = await generateAllCaptions(products, storeName, storeData.id);
+      // If a specific product is selected, generate for that product only
+      // Otherwise, generate for the first product only on initial load
+      const productsToGenerate = selected_product_id 
+        ? products.filter(p => p.id === selected_product_id)
+        : [products[0]]; // Only first product for initial generation
       
+      captionResults = await generateAllCaptions(productsToGenerate, storeName, storeData.id);
+     
       // Check if caption generation failed
       if (!captionResults || captionResults.length === 0 || captionResults[0]?.captions?.length === 0) {
         return NextResponse.json(
