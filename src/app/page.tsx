@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { GenerationResponse, CaptionStyle } from '@/types';
+import { GenerationResponse, CaptionStyle, ShopifyProduct } from '@/types';
 import { CAPTION_STYLES, getDefaultSelectedStyles } from '@/lib/caption-styles';
 
 export default function HomePage() {
@@ -15,8 +15,10 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [selectedStyles, setSelectedStyles] = useState<CaptionStyle[]>(getDefaultSelectedStyles());
   const [showStyleSelection, setShowStyleSelection] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
+  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
 
-  const handleGenerate = async (withEmail = false) => {
+  const handleGenerate = async (withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
       setError('Please enter a Shopify store URL');
       return;
@@ -33,6 +35,7 @@ export default function HomePage() {
         },
         body: JSON.stringify({
           shopify_url: url,
+          ...(forceRefresh && { force_refresh: true }),
           ...(withEmail && { 
             email: email.trim(),
             selected_styles: selectedStyles
@@ -70,8 +73,15 @@ export default function HomePage() {
     );
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedCaption(text);
+      // Clear the copied state after 2 seconds
+      setTimeout(() => setCopiedCaption(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
   };
 
   const exportToCSV = () => {
@@ -103,6 +113,8 @@ export default function HomePage() {
     setError('');
     setSelectedStyles(getDefaultSelectedStyles());
     setShowStyleSelection(false);
+    setSelectedProduct(null);
+    setCopiedCaption(null);
   };
 
   return (
@@ -140,11 +152,6 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative px-4 lg:px-6 py-32">
         <div className="max-w-6xl mx-auto text-center">
-          <div className="mb-8">
-            <span className="inline-block px-4 py-2 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-full text-purple-200 text-sm font-medium border border-purple-500/30 mb-6">
-              🚀 AI-Powered Caption Generator
-            </span>
-          </div>
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-8 leading-tight">
             Turn Your Shopify Products Into 
             <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Social Media Gold</span>
@@ -178,21 +185,34 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  <Button
-                    onClick={() => handleGenerate(false)}
-                    disabled={loading || !url.trim()}
-                    className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-14 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                    size="lg"
-                  >
-                    {loading ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Generating...
-                      </div>
-                    ) : (
-                      'Generate Preview Captions ✨'
-                    )}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleGenerate(false)}
+                      disabled={loading || !url.trim()}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-14 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      size="lg"
+                    >
+                      {loading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Generating...
+                        </div>
+                      ) : (
+                        'Generate Preview Captions ✨'
+                      )}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => handleGenerate(false, true)}
+                      disabled={loading || !url.trim()}
+                      variant="outline"
+                      className="bg-slate-700/50 backdrop-blur-sm border-slate-600/50 text-white hover:bg-slate-700/70 hover:border-amber-400 transition-all duration-300 h-14 px-4 rounded-xl"
+                      size="lg"
+                      title="Force refresh data from Shopify"
+                    >
+                      🔄
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -214,10 +234,32 @@ export default function HomePage() {
 
                   {/* Email Collection (if needed) */}
                   {result.requires_email && (
-                    <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-white/20">
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-2xl" />
+                    <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-slate-600/30">
+                      <div className="absolute inset-0 bg-gradient-to-r from-slate-700/20 to-slate-600/20 rounded-2xl" />
                       <div className="relative">
-                        <h4 className="font-semibold mb-4 text-white text-lg">🚀 Get All Caption Styles + CSV Export</h4>
+                        <h4 className="font-semibold mb-6 text-white text-lg">📧 Get All Caption Styles + CSV Export</h4>
+                        
+                        {/* Product Selection */}
+                        <div className="mb-6">
+                          <label className="block text-sm font-medium text-white/90 mb-3">Choose Product to Generate For:</label>
+                          <select 
+                            className="w-full bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 text-white rounded-xl h-12 px-4 focus:bg-slate-700/70 focus:border-blue-400 transition-all duration-300"
+                            onChange={(e) => {
+                              const productId = e.target.value;
+                              const product = result.products?.find(p => p.id === productId);
+                              if (product) {
+                                setSelectedProduct(product);
+                              }
+                            }}
+                          >
+                            <option value="">Select a product...</option>
+                            {result.products?.map(product => (
+                              <option key={product.id} value={product.id}>
+                                {product.name} - ${product.price}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       
                       {/* Style Selection */}
                       <div className="mb-4">
@@ -250,19 +292,23 @@ export default function HomePage() {
                         )}
                       </div>
 
-                      <div className="flex gap-3">
-                        <Input
-                          type="email"
-                          placeholder="your@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="flex-1 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300"
-                          disabled={loading}
-                        />
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-white/90 mb-3">Email Address:</label>
+                          <Input
+                            type="email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-slate-700/50 backdrop-blur-sm border-slate-600/50 text-white placeholder:text-white/50 rounded-xl h-12 px-4 focus:bg-slate-700/70 focus:border-blue-400 transition-all duration-300"
+                            disabled={loading}
+                          />
+                        </div>
+                        
                         <Button
                           onClick={handleEmailSubmit}
-                          disabled={loading || !email.trim() || selectedStyles.length === 0}
-                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-12 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                          disabled={loading || !email.trim() || selectedStyles.length === 0 || !selectedProduct}
+                          className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold h-12 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                         >
                           {loading ? (
                             <div className="flex items-center gap-2">
@@ -270,13 +316,16 @@ export default function HomePage() {
                               Generating...
                             </div>
                           ) : (
-                            `Generate ${selectedStyles.length} Styles ✨`
+                            `Generate ${selectedStyles.length} Styles for ${selectedProduct?.name || 'Selected Product'} ✨`
                           )}
                         </Button>
                       </div>
                       
                       {selectedStyles.length === 0 && (
                         <p className="text-red-300 text-sm mt-2">Please select at least one caption style</p>
+                      )}
+                      {!selectedProduct && (
+                        <p className="text-amber-300 text-sm mt-2">Please select a product to generate captions for</p>
                       )}
                       </div>
                     </div>
@@ -292,13 +341,13 @@ export default function HomePage() {
                         .replace(/\b\w/g, l => l.toUpperCase());
 
                       return (
-                        <div key={index} className="relative bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 overflow-hidden hover:bg-white/15 transition-all duration-300">
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 rounded-2xl" />
+                        <div key={index} className="relative bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-600/30 overflow-hidden hover:bg-slate-800/60 transition-all duration-300">
+                          <div className="absolute inset-0 bg-gradient-to-r from-slate-700/10 to-slate-600/10 rounded-2xl" />
                           <div className="relative">
                             {/* Header with style and product info */}
-                            <div className="flex items-center justify-between p-4 border-b border-white/10">
+                            <div className="flex items-center justify-between p-4 border-b border-slate-600/30">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center">
                                   <span className="text-white text-lg">{styleInfo?.emoji || '✨'}</span>
                                 </div>
                                 <div>
@@ -310,15 +359,19 @@ export default function HomePage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => copyToClipboard(caption.caption_text)}
-                                className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:border-blue-400 transition-all duration-300 rounded-xl px-4 py-2"
+                                className={`backdrop-blur-sm border-slate-600/50 text-white hover:border-emerald-400 transition-all duration-300 rounded-xl px-4 py-2 ${
+                                  copiedCaption === caption.caption_text 
+                                    ? 'bg-emerald-600/70 border-emerald-500' 
+                                    : 'bg-slate-700/50 hover:bg-slate-700/70'
+                                }`}
                               >
-                                📋 Copy
+                                {copiedCaption === caption.caption_text ? '✅ Copied!' : '📋 Copy'}
                               </Button>
                             </div>
                             
                             {/* Caption content */}
                             <div className="p-4">
-                              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border-l-4 border-blue-400">
+                              <div className="bg-slate-700/30 backdrop-blur-sm rounded-xl p-4 border-l-4 border-emerald-400">
                                 <p className="text-white/90 leading-relaxed text-base">
                                   {caption.caption_text}
                                 </p>

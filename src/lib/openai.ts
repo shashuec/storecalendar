@@ -18,7 +18,7 @@ const CAPTION_STYLES: Record<CaptionStyle, string> = {
 
 async function logOpenAIRequest(
   storeId: string,
-  productId: string,
+  shopifyProductId: string,
   style: CaptionStyle,
   prompt: string,
   response: string | null,
@@ -29,9 +29,22 @@ async function logOpenAIRequest(
   error?: string
 ) {
   try {
+    // Find the database product ID from Shopify product ID
+    const { data: product } = await supabase
+      .from('calendar_products')
+      .select('id')
+      .eq('store_id', storeId)
+      .eq('shopify_product_id', shopifyProductId)
+      .single();
+    
+    if (!product) {
+      console.error('Product not found for logging:', shopifyProductId);
+      return;
+    }
+    
     await supabase.from('calendar_openai_logs').insert({
       store_id: storeId,
-      product_id: productId,
+      product_id: product.id,
       caption_style: style,
       request_prompt: prompt,
       response_text: response,

@@ -8,7 +8,7 @@ import { GenerationResponse } from '@/types';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { shopify_url, email, selected_styles } = body;
+    const { shopify_url, email, selected_styles, force_refresh } = body;
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -57,57 +57,136 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Scrape Shopify store
-    const { storeName, products } = await scrapeShopifyStore(shopify_url);
+    // Check if we have cached data (within 6 hours)
+    const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     
-    if (products.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No products found. Please check if store has published products.' },
-        { status: 400 }
-      );
-    }
-    
-    // Store/update store data
-    const { data: storeData, error: storeError } = await supabase
+    // Try to get existing store data
+    const { data: existingStore } = await supabase
       .from('calendar_stores')
-      .upsert({
-        shopify_url: shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, ''),
-        store_name: storeName,
-        last_scraped: new Date().toISOString()
-      }, {
-        onConflict: 'shopify_url'
-      })
-      .select()
+      .select('*')
+      .eq('shopify_url', cleanUrl)
       .single();
     
-    if (storeError) {
-      console.error('Store upsert error:', storeError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to process store data' },
-        { status: 500 }
-      );
+    let storeName, products, storeData;
+    
+    // Check if we need to scrape fresh data
+    const needsFreshData = force_refresh || 
+      !existingStore || 
+      !existingStore.last_scraped || 
+      existingStore.last_scraped < sixHoursAgo;
+    
+    if (needsFreshData) {
+      console.log(force_refresh ? 'Force refresh requested' : 'Cache miss or expired - scraping fresh data');
+      
+      // Scrape fresh data from Shopify
+      const scrapedData = await scrapeShopifyStore(shopify_url);
+      storeName = scrapedData.storeName;
+      products = scrapedData.products;
+      
+      if (products.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No products found. Please check if store has published products.' },
+          { status: 400 }
+        );
+      }
+      
+      // Store/update store data with fresh timestamp
+      const { data: freshStoreData, error: storeError } = await supabase
+        .from('calendar_stores')
+        .upsert({
+          shopify_url: cleanUrl,
+          store_name: storeName,
+          last_scraped: new Date().toISOString()
+        }, {
+          onConflict: 'shopify_url'
+        })
+        .select()
+        .single();
+      
+      if (storeError) {
+        console.error('Store upsert error:', storeError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to process store data' },
+          { status: 500 }
+        );
+      }
+      
+      storeData = freshStoreData;
+      
+    } else {
+      console.log('Cache hit - using existing data');
+      
+      // Use cached store data
+      storeData = existingStore;
+      storeName = existingStore.store_name;
+      
+      // Get cached products
+      const { data: cachedProducts, error: productsError } = await supabase
+        .from('calendar_products')
+        .select('*')
+        .eq('store_id', existingStore.id)
+        .order('created_at', { ascending: false });
+      
+      if (productsError || !cachedProducts || cachedProducts.length === 0) {
+        console.log('No cached products found - falling back to scraping');
+        
+        // Fallback to scraping if no cached products
+        const scrapedData = await scrapeShopifyStore(shopify_url);
+        storeName = scrapedData.storeName;
+        products = scrapedData.products;
+        
+        if (products.length === 0) {
+          return NextResponse.json(
+            { success: false, error: 'No products found. Please check if store has published products.' },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Transform cached products to match expected format
+        products = cachedProducts.map(p => ({
+          id: p.shopify_product_id,
+          name: p.product_name,
+          description: p.description || '',
+          price: p.price || '0',
+          image_url: p.image_url || ''
+        }));
+      }
     }
     
-    // Store products
-    const productsToInsert = products.map(product => ({
-      store_id: storeData.id,
-      product_name: product.name,
-      description: product.description,
-      price: product.price,
-      image_url: product.image_url,
-      shopify_product_id: product.id
-    }));
-    
-    const { data: productData, error: productError } = await supabase
-      .from('calendar_products')
-      .upsert(productsToInsert, {
-        onConflict: 'store_id,shopify_product_id'
-      })
-      .select();
-    
-    if (productError) {
-      console.error('Product upsert error:', productError);
-      // Continue anyway - we can still generate captions
+    // Store products only if we scraped fresh data
+    let productData;
+    if (needsFreshData) {
+      const productsToInsert = products.map(product => ({
+        store_id: storeData.id,
+        product_name: product.name,
+        description: product.description,
+        price: product.price,
+        image_url: product.image_url,
+        shopify_product_id: product.id
+      }));
+      
+      const { data: freshProductData, error: productError } = await supabase
+        .from('calendar_products')
+        .upsert(productsToInsert, {
+          onConflict: 'store_id,shopify_product_id'
+        })
+        .select();
+      
+      if (productError) {
+        console.error('Product upsert error:', productError);
+        // Continue anyway - we can still generate captions
+      }
+      
+      productData = freshProductData;
+    } else {
+      // Get existing product data for database operations
+      const { data: existingProductData } = await supabase
+        .from('calendar_products')
+        .select('*')
+        .eq('store_id', storeData.id);
+      
+      productData = existingProductData;
     }
     
     // Generate captions based on email presence and selected styles
