@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,8 +15,16 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [selectedStyles, setSelectedStyles] = useState<CaptionStyle[]>(getDefaultSelectedStyles());
   const [showStyleSelection, setShowStyleSelection] = useState(false);
+  const [showAllCaptionsForm, setShowAllCaptionsForm] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+
+  // Auto-select first product when results come back
+  useEffect(() => {
+    if (result?.products && result.products.length > 0 && !selectedProduct) {
+      setSelectedProduct(result.products[0]);
+    }
+  }, [result?.products, selectedProduct]);
 
   const handleGenerate = async (withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
@@ -50,6 +58,10 @@ export default function HomePage() {
       }
 
       setResult(data);
+      // Auto-select first product if no product is selected
+      if (!selectedProduct && data.products && data.products.length > 0) {
+        setSelectedProduct(data.products[0]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -113,6 +125,7 @@ export default function HomePage() {
     setError('');
     setSelectedStyles(getDefaultSelectedStyles());
     setShowStyleSelection(false);
+    setShowAllCaptionsForm(false);
     setSelectedProduct(null);
     setCopiedCaption(null);
   };
@@ -218,32 +231,37 @@ export default function HomePage() {
 
               {/* Results Section */}
               {result && (
-                <div className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-5xl mx-auto border border-white/20 shadow-2xl">
-                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-3xl" />
-                  <div className="relative mb-8">
-                    <h3 className="text-3xl font-bold text-white mb-3">
-                      ✨ Results for {result.store_name}
+                <div className="bg-white rounded-2xl p-6 mb-12 max-w-4xl mx-auto border border-gray-200 shadow-sm">
+                  <div className="mb-6">
+                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                      Results for {result.store_name}
                     </h3>
-                    <p className="text-white/80 text-lg">
-                      {result.requires_email 
-                        ? 'Here are 3 preview captions. Enter your email to unlock all 7 styles:'
-                        : 'Here are all caption styles for your products:'
-                      }
-                    </p>
                   </div>
 
-                  {/* Email Collection (if needed) */}
-                  {result.requires_email && (
-                    <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 mb-8 border border-slate-600/30">
-                      <div className="absolute inset-0 bg-gradient-to-r from-slate-700/20 to-slate-600/20 rounded-2xl" />
-                      <div className="relative">
-                        <h4 className="font-semibold mb-6 text-white text-lg">📧 Get All Caption Styles + CSV Export</h4>
-                        
+                  {/* View All Captions Button */}
+                  {result.requires_email && !showAllCaptionsForm && (
+                    <div className="mb-6 text-center">
+                      <Button
+                        onClick={() => {
+                          setShowAllCaptionsForm(true);
+                          setShowStyleSelection(true);
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-12 px-6 rounded-lg transition-colors"
+                      >
+                        📧 View All 7 Caption Styles + CSV Export
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Email Collection Form */}
+                  {showAllCaptionsForm && (
+                    <div className="mb-6">
                         {/* Product Selection */}
-                        <div className="mb-6">
-                          <label className="block text-sm font-medium text-white/90 mb-3">Choose Product to Generate For:</label>
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Product:</label>
                           <select 
-                            className="w-full bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 text-white rounded-xl h-12 px-4 focus:bg-slate-700/70 focus:border-blue-400 transition-all duration-300"
+                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
+                            value={selectedProduct?.id || ''}
                             onChange={(e) => {
                               const productId = e.target.value;
                               const product = result.products?.find(p => p.id === productId);
@@ -261,46 +279,46 @@ export default function HomePage() {
                           </select>
                         </div>
                       
-                      {/* Style Selection */}
-                      <div className="mb-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowStyleSelection(!showStyleSelection)}
-                          className="mb-3"
-                        >
-                          {showStyleSelection ? 'Hide' : 'Customize'} Caption Styles ({selectedStyles.length} selected)
-                        </Button>
-                        
-                        {showStyleSelection && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-white rounded-lg border">
-                            {CAPTION_STYLES.map((style) => (
-                              <div key={style.id} className="space-y-2">
-                                <Checkbox
-                                  id={style.id}
-                                  checked={selectedStyles.includes(style.id)}
-                                  onChange={() => handleStyleToggle(style.id)}
-                                  label={`${style.emoji} ${style.name}`}
-                                />
-                                <p className="text-xs text-gray-600 ml-6">{style.description}</p>
-                                <div className="text-xs text-gray-500 ml-6 p-2 bg-gray-50 rounded italic">
-                                  &ldquo;{style.example}&rdquo;
+                        {/* Style Selection */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Caption Styles:</label>
+                          <select 
+                            className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
+                            value={`${selectedStyles.length} selected`}
+                            onChange={() => setShowStyleSelection(!showStyleSelection)}
+                          >
+                            <option value={`${selectedStyles.length} selected`}>
+                              {selectedStyles.length} caption styles selected
+                            </option>
+                          </select>
+                          
+                          {showStyleSelection && (
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border">
+                              {CAPTION_STYLES.map((style) => (
+                                <div key={style.id} className="space-y-1">
+                                  <Checkbox
+                                    id={style.id}
+                                    checked={selectedStyles.includes(style.id)}
+                                    onChange={() => handleStyleToggle(style.id)}
+                                    label={`${style.emoji} ${style.name}`}
+                                  />
+                                  <p className="text-xs text-gray-600 ml-6">{style.description}</p>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
-                      <div className="space-y-4">
+                        {/* Email Input */}
+                        <div className="space-y-3">
                         <div>
-                          <label className="block text-sm font-medium text-white/90 mb-3">Email Address:</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Email Address:</label>
                           <Input
                             type="email"
                             placeholder="your@email.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full bg-slate-700/50 backdrop-blur-sm border-slate-600/50 text-white placeholder:text-white/50 rounded-xl h-12 px-4 focus:bg-slate-700/70 focus:border-blue-400 transition-all duration-300"
+                            className="w-full bg-white border border-gray-300 text-gray-900 placeholder:text-gray-500 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
                             disabled={loading}
                           />
                         </div>
@@ -308,7 +326,7 @@ export default function HomePage() {
                         <Button
                           onClick={handleEmailSubmit}
                           disabled={loading || !email.trim() || selectedStyles.length === 0 || !selectedProduct}
-                          className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold h-12 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {loading ? (
                             <div className="flex items-center gap-2">
@@ -316,99 +334,79 @@ export default function HomePage() {
                               Generating...
                             </div>
                           ) : (
-                            `Generate ${selectedStyles.length} Styles for ${selectedProduct?.name || 'Selected Product'} ✨`
+                            `Generate ${selectedStyles.length} Styles for ${selectedProduct?.name || 'Selected Product'}`
                           )}
                         </Button>
-                      </div>
-                      
-                      {selectedStyles.length === 0 && (
-                        <p className="text-red-300 text-sm mt-2">Please select at least one caption style</p>
-                      )}
-                      {!selectedProduct && (
-                        <p className="text-amber-300 text-sm mt-2">Please select a product to generate captions for</p>
-                      )}
+                        
+                        {selectedStyles.length === 0 && (
+                          <p className="text-red-600 text-sm mt-2">Please select at least one caption style</p>
+                        )}
+                        {!selectedProduct && (
+                          <p className="text-amber-600 text-sm mt-2">Please select a product to generate captions for</p>
+                        )}
                       </div>
                     </div>
                   )}
 
                   {/* Captions Display */}
-                  <div className="space-y-4">
+                  {(result.preview_captions || result.captions || []).length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
                     {(result.preview_captions || result.captions || []).map((caption, index) => {
-                      const product = result.products?.find(p => p.id === caption.product_id);
                       const styleInfo = CAPTION_STYLES.find(s => s.id === caption.caption_style);
                       const styleDisplay = caption.caption_style
                         .replace(/_/g, ' ')
                         .replace(/\b\w/g, l => l.toUpperCase());
 
                       return (
-                        <div key={index} className="relative bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-slate-600/30 overflow-hidden hover:bg-slate-800/60 transition-all duration-300">
-                          <div className="absolute inset-0 bg-gradient-to-r from-slate-700/10 to-slate-600/10 rounded-2xl" />
-                          <div className="relative">
-                            {/* Header with style and product info */}
-                            <div className="flex items-center justify-between p-4 border-b border-slate-600/30">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center">
-                                  <span className="text-white text-lg">{styleInfo?.emoji || '✨'}</span>
-                                </div>
-                                <div>
-                                  <h5 className="font-semibold text-white text-lg">{styleDisplay}</h5>
-                                  <p className="text-white/60 text-sm">for {product?.name}</p>
-                                </div>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => copyToClipboard(caption.caption_text)}
-                                className={`backdrop-blur-sm border-slate-600/50 text-white hover:border-emerald-400 transition-all duration-300 rounded-xl px-4 py-2 ${
-                                  copiedCaption === caption.caption_text 
-                                    ? 'bg-emerald-600/70 border-emerald-500' 
-                                    : 'bg-slate-700/50 hover:bg-slate-700/70'
-                                }`}
-                              >
-                                {copiedCaption === caption.caption_text ? '✅ Copied!' : '📋 Copy'}
-                              </Button>
+                        <div key={index} className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{styleInfo?.emoji || '✨'}</span>
+                              <h5 className="font-medium text-gray-900 text-sm">{styleDisplay}</h5>
                             </div>
-                            
-                            {/* Caption content */}
-                            <div className="p-4">
-                              <div className="bg-slate-700/30 backdrop-blur-sm rounded-xl p-4 border-l-4 border-emerald-400">
-                                <p className="text-white/90 leading-relaxed text-base">
-                                  {caption.caption_text}
-                                </p>
-                              </div>
-                              
-                              {/* Style description */}
-                              {styleInfo && (
-                                <div className="mt-3 text-xs text-white/50">
-                                  <span className="font-medium">Best for:</span> {styleInfo.description}
-                                </div>
-                              )}
-                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyToClipboard(caption.caption_text)}
+                              className={`border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors rounded px-2 py-1 text-xs ${
+                                copiedCaption === caption.caption_text 
+                                  ? 'bg-green-50 border-green-200 text-green-700' 
+                                  : ''
+                              }`}
+                            >
+                              {copiedCaption === caption.caption_text ? '✓' : 'Copy'}
+                            </Button>
                           </div>
+                          <p className="text-gray-800 text-sm leading-relaxed mb-1">
+                            {caption.caption_text}
+                          </p>
+                          {styleInfo && (
+                            <div className="text-xs text-gray-500">
+                              <span className="font-medium">Best for:</span> {styleInfo.description}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
-                  </div>
-
-                  {/* Export Button */}
-                  {result.captions && (
-                    <div className="mt-8 text-center">
-                      <Button
-                        onClick={exportToCSV}
-                        variant="outline"
-                        size="lg"
-                        className="border-indigo-600 text-indigo-600 hover:bg-indigo-50"
-                      >
-                        Export to CSV
-                      </Button>
                     </div>
                   )}
 
-                  {/* Reset Button */}
-                  <div className="mt-8 text-center">
+                  {/* Action Buttons */}
+                  <div className="mt-6 flex justify-center gap-3">
+                    {result.captions && (
+                      <Button
+                        onClick={exportToCSV}
+                        variant="outline"
+                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        Export to CSV
+                      </Button>
+                    )}
                     <Button
                       onClick={resetForm}
-                      variant="ghost"
+                      variant="outline"
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
                     >
                       Try Another Store
                     </Button>

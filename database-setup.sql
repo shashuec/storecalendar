@@ -80,18 +80,14 @@ BEGIN
     END IF;
 END $$;
 
--- OpenAI logs table (for debugging and cost tracking)
+-- OpenAI logs table (simplified for cost tracking)
 CREATE TABLE IF NOT EXISTS calendar_openai_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   store_id UUID REFERENCES calendar_stores(id) ON DELETE CASCADE,
-  product_id UUID REFERENCES calendar_products(id) ON DELETE CASCADE,
-  caption_style TEXT NOT NULL,
-  request_prompt TEXT NOT NULL,
-  response_text TEXT,
-  model_used TEXT NOT NULL,
-  prompt_tokens INTEGER,
-  completion_tokens INTEGER,
+  product_name TEXT NOT NULL,
+  model_used TEXT NOT NULL DEFAULT 'gpt-4o',
   total_tokens INTEGER,
+  cost_cents INTEGER, -- Cost in cents for easy tracking
   response_time_ms INTEGER,
   success BOOLEAN DEFAULT true,
   error_message TEXT,
@@ -103,6 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_calendar_stores_url ON calendar_stores(shopify_ur
 CREATE INDEX IF NOT EXISTS idx_calendar_products_store ON calendar_products(store_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_captions_product ON calendar_captions(product_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_openai_logs_store ON calendar_openai_logs(store_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_openai_logs_date ON calendar_openai_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_calendar_emails_store ON calendar_emails(store_id);
 
 -- Verify tables were created

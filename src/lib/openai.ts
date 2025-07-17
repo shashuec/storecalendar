@@ -18,40 +18,24 @@ const CAPTION_STYLES: Record<CaptionStyle, string> = {
 
 async function logOpenAIRequest(
   storeId: string,
-  shopifyProductId: string,
-  style: CaptionStyle,
-  prompt: string,
-  response: string | null,
+  productName: string,
   model: string,
-  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null,
+  usage: { total_tokens?: number } | null,
   responseTime: number,
   success: boolean,
   error?: string
 ) {
   try {
-    // Find the database product ID from Shopify product ID
-    const { data: product } = await supabase
-      .from('calendar_products')
-      .select('id')
-      .eq('store_id', storeId)
-      .eq('shopify_product_id', shopifyProductId)
-      .single();
-    
-    if (!product) {
-      console.error('Product not found for logging:', shopifyProductId);
-      return;
-    }
+    // Calculate approximate cost in cents (GPT-4o pricing: ~$15 per 1M tokens)
+    const totalTokens = usage?.total_tokens || 0;
+    const costCents = Math.round((totalTokens / 1000000) * 1500); // $15 per 1M tokens = 1500 cents
     
     await supabase.from('calendar_openai_logs').insert({
       store_id: storeId,
-      product_id: product.id,
-      caption_style: style,
-      request_prompt: prompt,
-      response_text: response,
+      product_name: productName,
       model_used: model,
-      prompt_tokens: usage?.prompt_tokens || 0,
-      completion_tokens: usage?.completion_tokens || 0,
-      total_tokens: usage?.total_tokens || 0,
+      total_tokens: totalTokens,
+      cost_cents: costCents,
       response_time_ms: responseTime,
       success,
       error_message: error
@@ -71,99 +55,116 @@ export async function generateCaptions(
   const results = [];
   
   for (const product of products.slice(0, 3)) { // Limit to first 3 products for initial generation
-    const productCaptions = [];
+    const startTime = Date.now();
+    let success = false;
+    let error: string | undefined;
+    let completion: OpenAI.ChatCompletion;
     
-    for (const style of styles) {
-      const startTime = Date.now();
-      let success = false;
-      let captionText = '';
-      let error: string | undefined;
+    try {
+      // Create style descriptions for the prompt
+      const styleDescriptions = styles.map(style => `
+${style.toUpperCase().replace('_', ' ')}: ${CAPTION_STYLES[style]}`).join('');
       
-      try {
-        const prompt = `
+      const prompt = `
 You are a social media expert creating content for "${storeName}".
 
 Product: ${product.name}
 Description: ${product.description}
 Price: $${product.price}
 
-Style: ${CAPTION_STYLES[style]}
+Generate ${styles.length} different social media captions for this product using these styles:${styleDescriptions}
 
-Create a social media caption that:
-- Is 150-280 characters (Instagram/Twitter friendly)
-- Includes relevant hashtags (2-3 max)
-- Matches the specified style perfectly
-- Sounds natural and engaging
-- Includes product name naturally
+For each caption:
+- Keep it 150-280 characters (Instagram/Twitter friendly)
+- Include 2-3 relevant hashtags max
+- Make it sound natural and engaging
+- Include product name naturally
 
-Return only the caption text, no additional formatting or explanations.
-        `;
+Return ONLY a JSON object with this exact format:
+{
+  "${styles[0]}": "caption text here",
+  "${styles[1]}": "caption text here",
+  ${styles.slice(2).map(style => `"${style}": "caption text here"`).join(',\n  ')}
+}
 
-        const completion = await openai.chat.completions.create({
-          model: process.env.OPENAI_MODEL || 'gpt-4o',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150,
-          temperature: 0.7,
-        });
+Return only the JSON, no additional text or formatting.
+      `;
 
-        captionText = completion.choices[0]?.message?.content?.trim() || '';
-        const responseTime = Date.now() - startTime;
-        
-        if (captionText) {
-          productCaptions.push({
-            style,
-            text: captionText
-          });
-          success = true;
-        }
-
-        // Log the request
-        if (storeId) {
-          await logOpenAIRequest(
-            storeId,
-            product.id,
-            style,
-            prompt,
-            captionText,
-            process.env.OPENAI_MODEL || 'gpt-4o',
-            completion.usage || null,
-            responseTime,
-            success,
-            error
-          );
-        }
-        
-      } catch (err) {
-        error = err instanceof Error ? err.message : 'Unknown error';
-        const responseTime = Date.now() - startTime;
-        
-        console.error(`Error generating ${style} caption for ${product.name}:`, err);
-        
-        // Log the failed request
-        if (storeId) {
-          await logOpenAIRequest(
-            storeId,
-            product.id,
-            style,
-            `Error occurred during generation`,
-            null,
-            process.env.OPENAI_MODEL || 'gpt-4o',
-            null,
-            responseTime,
-            false,
-            error
-          );
-        }
-        
-        // Continue with other captions even if one fails
-      }
-    }
-    
-    if (productCaptions.length > 0) {
-      results.push({
-        product,
-        captions: productCaptions
+      completion = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 800, // Increased for multiple captions
+        temperature: 0.7,
       });
+
+      let responseText = completion.choices[0]?.message?.content?.trim() || '';
+      const responseTime = Date.now() - startTime;
+      
+      if (responseText) {
+        try {
+          // Clean the response - remove markdown code blocks if present
+          responseText = responseText.replace(/```json\s*/, '').replace(/```\s*$/, '').trim();
+          
+          // Parse the JSON response
+          const captionsJson = JSON.parse(responseText);
+          const productCaptions = [];
+          
+          // Extract captions for each style
+          for (const style of styles) {
+            if (captionsJson[style]) {
+              productCaptions.push({
+                style,
+                text: captionsJson[style]
+              });
+            }
+          }
+          
+          if (productCaptions.length > 0) {
+            results.push({
+              product,
+              captions: productCaptions
+            });
+            success = true;
+          }
+          
+        } catch (parseError) {
+          console.error('Failed to parse OpenAI response:', parseError);
+          console.error('Response was:', responseText);
+          error = 'Failed to parse response';
+        }
+      }
+
+      // Log the request (single log for all styles)
+      if (storeId) {
+        await logOpenAIRequest(
+          storeId,
+          product.name,
+          process.env.OPENAI_MODEL || 'gpt-4o',
+          completion.usage || null,
+          responseTime,
+          success,
+          error
+        );
+      }
+      
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unknown error';
+      const responseTime = Date.now() - startTime;
+      
+      console.error(`Error generating captions for ${product.name}:`, err);
+      
+      // Log the failed request
+      if (storeId) {
+        await logOpenAIRequest(
+          storeId,
+          product.name,
+          process.env.OPENAI_MODEL || 'gpt-4o',
+          null,
+          responseTime,
+          false,
+          error
+        );
+      }
     }
   }
   
