@@ -77,17 +77,23 @@ export default function HomePage() {
         throw new Error(data.error || 'Failed to generate captions');
       }
 
-      if (data.all_captions) {
+      if (data.all_captions && data.all_captions.length > 0) {
         // Store all captions and show first 3 as preview
         setAllCaptions(data.all_captions);
+        const previewCaptions = data.all_captions.slice(0, 3);
+        console.log('Setting preview captions:', previewCaptions);
         setResult({
           ...data,
-          preview_captions: data.all_captions.slice(0, 3)
+          preview_captions: previewCaptions
         });
       } else if (data.email_stored) {
         // Email was stored successfully - show all captions
         setShowFullCaptions(true);
         setShowEmailForm(false);
+      } else if (data.success && (!data.all_captions || data.all_captions.length === 0)) {
+        // API succeeded but no captions generated - show helpful error
+        setError('Unable to generate captions at the moment. This could be due to high demand or temporary service issues. Please try again in a few minutes.');
+        setResult(null);
       } else {
         setResult(data);
       }
@@ -97,7 +103,16 @@ export default function HomePage() {
         setSelectedProduct(data.products[0]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      
+      // Provide more helpful error messages for common issues
+      if (errorMessage.includes('429') || errorMessage.includes('quota')) {
+        setError('Service temporarily unavailable due to high demand. Please try again in a few minutes.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -360,10 +375,13 @@ export default function HomePage() {
                   </div>
 
                   {/* Captions Display */}
-                  {((showFullCaptions ? allCaptions : result.preview_captions) || result.captions || []).length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
-                    {(showFullCaptions ? allCaptions : (result.preview_captions || result.captions || [])).map((caption, index) => {
+                  {(() => {
+                    const captionsToShow = showFullCaptions ? allCaptions : (result.preview_captions || result.captions || []);
+                    console.log('Captions to show:', captionsToShow, 'showFullCaptions:', showFullCaptions, 'allCaptions:', allCaptions, 'preview_captions:', result.preview_captions);
+                    return captionsToShow.length > 0 ? (
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
+                        {captionsToShow.map((caption, index) => {
                       const styleInfo = CAPTION_STYLES.find(s => s.id === caption.caption_style);
                       const styleDisplay = caption.caption_style
                         .replace(/_/g, ' ')
@@ -400,8 +418,9 @@ export default function HomePage() {
                         </div>
                       );
                     })}
-                    </div>
-                  )}
+                      </div>
+                    ) : null;
+                  })()}
 
                   {/* Action Buttons */}
                   <div className="mt-6 flex justify-center gap-3">
