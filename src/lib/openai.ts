@@ -113,7 +113,7 @@ Return only the caption text, no additional formatting or explanations.
             prompt,
             captionText,
             process.env.OPENAI_MODEL || 'gpt-4o',
-            completion.usage,
+            completion.usage || null,
             responseTime,
             success,
             error

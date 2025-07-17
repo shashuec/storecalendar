@@ -13,7 +13,13 @@ export async function scrapeShopifyStore(url: string): Promise<{
     const productsResponse = await fetch(`${shopifyUrl}/products.json?limit=10`);
     
     if (!productsResponse.ok) {
-      throw new Error('Unable to fetch store data. Please check the URL.');
+      if (productsResponse.status === 404) {
+        throw new Error('This URL does not appear to be a Shopify store. Please check the URL.');
+      } else if (productsResponse.status === 401 || productsResponse.status === 403) {
+        throw new Error('This store is password protected or private. Please make it public temporarily.');
+      } else {
+        throw new Error(`Unable to fetch store data (${productsResponse.status}). Please check the URL.`);
+      }
     }
     
     const productsData = await productsResponse.json();
@@ -51,15 +57,36 @@ export async function scrapeShopifyStore(url: string): Promise<{
   }
 }
 
-export function validateShopifyUrl(url: string): boolean {
+export async function validateShopifyUrl(url: string): Promise<boolean> {
   try {
-    const cleanUrl = url.replace(/^https?:\/\//, '');
+    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     
-    // Check if it's a Shopify domain
-    return cleanUrl.includes('.myshopify.com') || 
-           cleanUrl.includes('.shopify.com') ||
-           // Also allow custom domains that might be Shopify stores
-           /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(cleanUrl);
+    // Basic URL format validation
+    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanUrl)) {
+      return false;
+    }
+    
+    // Test if it's actually a Shopify store by checking products.json
+    const testUrl = `https://${cleanUrl}/products.json?limit=1`;
+    const response = await fetch(testUrl, { 
+      method: 'HEAD', // Just check if endpoint exists
+      signal: AbortSignal.timeout(5000) // 5 second timeout
+    });
+    
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Keep synchronous version for basic format checking
+export function validateShopifyUrlFormat(url: string): boolean {
+  try {
+    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    // Accept any properly formatted domain
+    // Could be .myshopify.com, custom domain, or any domain with Shopify
+    return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanUrl);
   } catch {
     return false;
   }

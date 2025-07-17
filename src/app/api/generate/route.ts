@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeShopifyStore, validateShopifyUrl } from '@/lib/shopify';
+import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
 import { generatePreviewCaptions, generateCaptions } from '@/lib/openai';
 import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
@@ -18,11 +18,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!validateShopifyUrl(shopify_url)) {
+    if (!validateShopifyUrlFormat(shopify_url)) {
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Please enter a valid Shopify store URL (e.g., shop.myshopify.com)' 
+          error: 'Please enter a valid URL (e.g., shop.myshopify.com or yourcustomdomain.com)' 
         },
         { status: 400 }
       );
