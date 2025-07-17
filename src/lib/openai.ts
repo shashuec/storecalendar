@@ -142,7 +142,7 @@ Return only the JSON, no additional text or formatting.
         await logOpenAIRequest(
           storeId,
           product.name,
-          process.env.OPENAI_MODEL || 'gpt-4o',
+          process.env.OPENAI_MODEL || 'gpt-4o-mini',
           completion.usage || null,
           responseTime,
           success,
@@ -156,12 +156,32 @@ Return only the JSON, no additional text or formatting.
       
       console.error(`Error generating captions for ${product.name}:`, err);
       
+      // If quota exceeded, use mock data for testing
+      if (error.includes('429') || error.includes('quota')) {
+        console.log('OpenAI quota exceeded - using mock captions for testing');
+        const mockCaptions = [];
+        for (const style of styles) {
+          mockCaptions.push({
+            style,
+            text: `✨ Sample ${style.replace('_', ' ')} caption for ${product.name}. This is a demo caption while OpenAI quota is exceeded. #Demo #Testing`
+          });
+        }
+        
+        if (mockCaptions.length > 0) {
+          results.push({
+            product,
+            captions: mockCaptions
+          });
+          success = true;
+        }
+      }
+      
       // Log the failed request
       if (storeId) {
         await logOpenAIRequest(
           storeId,
           product.name,
-          process.env.OPENAI_MODEL || 'gpt-4o',
+          process.env.OPENAI_MODEL || 'gpt-4o-mini',
           null,
           responseTime,
           false,

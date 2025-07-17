@@ -201,6 +201,14 @@ export async function POST(request: NextRequest) {
         : [products[0]]; // Only first product for initial generation
       
       captionResults = await generateAllCaptions(productsToGenerate, storeName, storeData.id);
+     
+      // Check if caption generation failed
+      if (!captionResults || captionResults.length === 0 || captionResults[0]?.captions?.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate captions. Please try again or contact support if the issue persists.' },
+          { status: 500 }
+        );
+      }
     } else {
       // Email provided - just return success (captions already generated)
       // Store email
