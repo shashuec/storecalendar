@@ -54,7 +54,10 @@ export async function generateCaptions(
   
   const results = [];
   
-  for (const product of products.slice(0, 3)) { // Limit to first 3 products for initial generation
+  // Process all provided products (for specific product selection) or limit to 3 for initial generation
+  const productsToProcess = products.length === 1 ? products : products.slice(0, 3);
+  
+  for (const product of productsToProcess) {
     const startTime = Date.now();
     let success = false;
     let error: string | undefined;
@@ -91,7 +94,7 @@ Return only the JSON, no additional text or formatting.
       `;
 
       completion = await openai.chat.completions.create({
-        model: process.env.OPENAI_MODEL || 'gpt-4o',
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 800, // Increased for multiple captions
         temperature: 0.7,
@@ -178,5 +181,6 @@ export async function generateAllCaptions(
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   // Generate ALL 7 caption styles upfront
   const allStyles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[];
-  return generateCaptions(products.slice(0, 1), storeName, allStyles, storeId); // Only first product, ALL 7 styles
+  // Generate for the provided products (could be one specific product or all products)
+  return generateCaptions(products, storeName, allStyles, storeId);
 }
