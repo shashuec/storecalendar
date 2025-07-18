@@ -3,48 +3,41 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { GenerationResponse, CaptionStyle, ShopifyProduct, Caption } from '@/types';
-import { CAPTION_STYLES, getDefaultSelectedStyles } from '@/lib/caption-styles';
+import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced } from '@/types';
+import { CountrySelector, CountrySelectorCompact } from '@/components/CountrySelector';
+import { ProductSelector } from '@/components/ProductSelector';
+import { BrandToneSelector, BrandToneSelectorCompact } from '@/components/BrandToneSelector';
+import { WeeklyCalendar } from '@/components/WeeklyCalendar';
+import { smartSelectProducts } from '@/lib/product-ranking';
 
 export default function HomePage() {
+  // Basic state
   const [url, setUrl] = useState('');
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<GenerationResponse | null>(null);
   const [error, setError] = useState('');
-  const [selectedStyles, setSelectedStyles] = useState<CaptionStyle[]>(getDefaultSelectedStyles());
-  const [showStyleSelection, setShowStyleSelection] = useState(false);
-  const [showAllCaptionsForm, setShowAllCaptionsForm] = useState(false);
-  const [showEmailForm, setShowEmailForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<ShopifyProduct | null>(null);
+  
+  // V1 form state
+  const [currentStep, setCurrentStep] = useState<'url' | 'products' | 'preferences' | 'results'>('url');
+  const [selectedCountry, setSelectedCountry] = useState<CountryCode>('US');
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedTone, setSelectedTone] = useState<BrandTone>('casual');
+  const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
+  
+  // Copy state for calendar posts
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
-  const [showFullCaptions, setShowFullCaptions] = useState(false); // Show all 7 vs just 3 preview
-  const [allCaptions, setAllCaptions] = useState<Caption[]>([]); // Store all generated captions
 
-  // Auto-select first product when results come back
+  // Auto-select products when enhanced products are loaded
   useEffect(() => {
-    if (result?.products && result.products.length > 0 && !selectedProduct) {
-      setSelectedProduct(result.products[0]);
+    if (result?.enhanced_products && result.enhanced_products.length > 0 && selectedProducts.length === 0) {
+      // Auto-select top 5 products using smart selection
+      const autoSelected = smartSelectProducts(result.enhanced_products, 5);
+      const selectedIds = autoSelected.filter(p => p.selected).map(p => p.id);
+      setSelectedProducts(selectedIds);
     }
-  }, [result?.products, selectedProduct]);
+  }, [result?.enhanced_products, selectedProducts.length]);
 
-  // Show email form when user changes product or clicks view all
-  const handleProductChange = (productId: string) => {
-    const product = result?.products?.find(p => p.id === productId);
-    if (product) {
-      setSelectedProduct(product);
-      // Show email form if user selects a different product than the first one
-      if (result?.products && product.id !== result.products[0]?.id) {
-        setShowEmailForm(true);
-      }
-    }
-  };
 
-  const handleViewAllStyles = () => {
-    setShowAllCaptionsForm(true);
-    setShowEmailForm(true);
-  };
 
   const handleGenerate = async (withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
@@ -56,19 +49,27 @@ export default function HomePage() {
     setError('');
 
     try {
+      const requestBody: Record<string, unknown> = {
+        shopify_url: url,
+        ...(forceRefresh && { force_refresh: true }),
+        // V1 parameters
+        country: selectedCountry,
+        brand_tone: selectedTone,
+        week_number: weekNumber
+      };
+
+      // Add selected products if user has made selections
+      if (selectedProducts.length > 0) {
+        requestBody.selected_products = selectedProducts;
+      }
+
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          shopify_url: url,
-          ...(forceRefresh && { force_refresh: true }),
-          ...(withEmail && { 
-            email: email.trim(),
-            selected_styles: selectedStyles
-          })
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data: GenerationResponse = await response.json();
@@ -77,31 +78,22 @@ export default function HomePage() {
         throw new Error(data.error || 'Failed to generate captions');
       }
 
-      if (data.all_captions && data.all_captions.length > 0) {
-        // Store all captions and show first 3 as preview
-        setAllCaptions(data.all_captions);
-        const previewCaptions = data.all_captions.slice(0, 3);
-        console.log('Setting preview captions:', previewCaptions);
-        setResult({
-          ...data,
-          preview_captions: previewCaptions
-        });
-      } else if (data.email_stored) {
-        // Email was stored successfully - show all captions
-        setShowFullCaptions(true);
-        setShowEmailForm(false);
-      } else if (data.success && (!data.all_captions || data.all_captions.length === 0)) {
-        // API succeeded but no captions generated - show helpful error
-        setError('Unable to generate captions at the moment. This could be due to high demand or temporary service issues. Please try again in a few minutes.');
-        setResult(null);
-      } else {
+      if (data.success) {
         setResult(data);
+        
+        // V1 flow: proceed to next step or show results
+        if (currentStep === 'url' && data.enhanced_products) {
+          setCurrentStep('products');
+        } else if (currentStep === 'products') {
+          setCurrentStep('preferences');
+        } else if (currentStep === 'preferences') {
+          setCurrentStep('results');
+        }
+
+      } else {
+        setError(data.error || 'Failed to generate content');
       }
       
-      // Auto-select first product if no product is selected
-      if (!selectedProduct && data.products && data.products.length > 0) {
-        setSelectedProduct(data.products[0]);
-      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
       
@@ -118,93 +110,49 @@ export default function HomePage() {
     }
   };
 
-  const handleEmailSubmit = async () => {
-    if (!email.trim()) {
-      setError('Please enter your email address');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shopify_url: url,
-          email: email.trim()
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.email_stored) {
-        // Email stored successfully - show all captions
-        setShowFullCaptions(true);
-        setShowEmailForm(false);
-        setError('');
-      } else {
-        setError(data.error || 'Failed to store email');
+  // Step navigation functions
+  const handleNextStep = () => {
+    if (currentStep === 'url') {
+      if (!url.trim()) {
+        setError('Please enter a Shopify store URL');
+        return;
       }
-    } catch {
-      setError('Failed to submit email');
-    } finally {
-      setLoading(false);
+      handleGenerate();
+    } else if (currentStep === 'products') {
+      if (selectedProducts.length < 3) {
+        setError('Please select at least 3 products');
+        return;
+      }
+      setCurrentStep('preferences');
+    } else if (currentStep === 'preferences') {
+      // Generate the final calendar
+      handleGenerate();
     }
+    setError('');
   };
 
-  const handleStyleToggle = (styleId: CaptionStyle) => {
-    setSelectedStyles(prev => 
-      prev.includes(styleId) 
-        ? prev.filter(id => id !== styleId)
-        : [...prev, styleId]
-    );
+  const handlePrevStep = () => {
+    if (currentStep === 'products') setCurrentStep('url');
+    else if (currentStep === 'preferences') setCurrentStep('products');
+    else if (currentStep === 'results') setCurrentStep('preferences');
+    setError('');
   };
 
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedCaption(text);
-      // Clear the copied state after 2 seconds
-      setTimeout(() => setCopiedCaption(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-    }
+  const handleGenerateWeek2 = () => {
+    setWeekNumber(2);
+    setCurrentStep('results');
+    handleGenerate();
   };
 
-  const exportToCSV = () => {
-    if (!result?.captions && !result?.preview_captions) return;
-    
-    const captions = result.captions || result.preview_captions || [];
-    const csvContent = [
-      ['Product', 'Caption Style', 'Caption Text'],
-      ...captions.map(caption => [
-        result.products?.find(p => p.id === caption.product_id)?.name || 'Product',
-        caption.caption_style.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        caption.caption_text
-      ])
-    ].map(row => row.map(field => `"${field.replace(/"/g, '""')}"`).join(',')).join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `${result.store_name || 'store'}-captions.csv`;
-    a.click();
-    window.URL.revokeObjectURL(downloadUrl);
-  };
+
 
   const resetForm = () => {
     setResult(null);
     setUrl('');
-    setEmail('');
     setError('');
-    setSelectedStyles(getDefaultSelectedStyles());
-    setShowStyleSelection(false);
-    setShowAllCaptionsForm(false);
-    setShowEmailForm(false);
-    setShowFullCaptions(false);
-    setAllCaptions([]);
-    setSelectedProduct(null);
+    setCurrentStep('url');
+    setSelectedProducts([]);
     setCopiedCaption(null);
   };
 
@@ -244,281 +192,230 @@ export default function HomePage() {
       <section className="relative px-4 lg:px-6 py-32">
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-8 leading-tight">
-            Turn Your Shopify Products Into 
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Social Media Gold</span>
+            Turn Your Products Into 
+            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Weekly Content Gold</span>
           </h1>
           <p className="text-xl text-white/70 mb-12 max-w-3xl mx-auto leading-relaxed">
-            Generate 7 different caption styles for your products in seconds. No more writer&apos;s block. No more boring posts. Just premium AI-generated content that converts.
+            Create a week&apos;s worth of strategic posts in 60 seconds. Holiday-aware content that connects with your audience. Never run out of content ideas again.
           </p>
               
-              {/* Generator Form */}
-              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-2xl mx-auto border border-white/20 shadow-2xl">
+              {/* V1 Multi-Step Generator Form */}
+              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 to-slate-700/30 rounded-3xl" />
                 <div className="relative space-y-6">
-                  <div>
-                    <label htmlFor="url" className="block text-sm font-medium text-white/90 mb-3">
-                      Shopify Store URL
-                    </label>
-                    <Input
-                      id="url"
-                      type="url"
-                      placeholder="e.g., mystore.myshopify.com or myshop.com"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-14 px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300"
-                      disabled={loading}
-                    />
-                  </div>
                   
+                  {/* Step Indicator */}
+                  <div className="flex items-center justify-center space-x-4 mb-8">
+                    {[
+                      { key: 'url', label: 'Store URL' },
+                      { key: 'products', label: 'Products' },
+                      { key: 'preferences', label: 'Preferences' },
+                      { key: 'results', label: 'Calendar' }
+                    ].map((stepInfo, index) => (
+                      <div key={stepInfo.key} className="flex items-center">
+                        <div className="flex flex-col items-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            currentStep === stepInfo.key 
+                              ? 'bg-blue-500 text-white' 
+                              : index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
+                                ? 'bg-green-500 text-white'
+                                : 'bg-white/20 text-white/60'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div className="text-xs text-white/70 mt-1 text-center">{stepInfo.label}</div>
+                        </div>
+                        {index < 3 && (
+                          <div className={`w-8 h-0.5 mx-2 ${
+                            index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
+                              ? 'bg-green-500'
+                              : 'bg-white/20'
+                          }`} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Step 1: URL Input */}
+                  {currentStep === 'url' && (
+                    <div className="space-y-6">
+                      <div>
+                        <label htmlFor="url" className="block text-sm font-medium text-white/90 mb-3">
+                          Enter Your Shopify Store URL
+                        </label>
+                        <Input
+                          id="url"
+                          type="url"
+                          placeholder="e.g., mystore.myshopify.com or myshop.com"
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-14 px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Product Selection */}
+                  {currentStep === 'products' && result?.enhanced_products && (
+                    <div className="space-y-6">
+                      <ProductSelector
+                        products={result.enhanced_products}
+                        selectedProducts={selectedProducts}
+                        onSelectionChange={setSelectedProducts}
+                        disabled={loading}
+                        minSelection={3}
+                        maxSelection={10}
+                      />
+                    </div>
+                  )}
+
+                  {/* Step 3: Preferences (Country + Brand Tone) */}
+                  {currentStep === 'preferences' && (
+                    <div className="space-y-6">
+                      <div className="text-center mb-4">
+                        <h3 className="text-lg font-medium text-white mb-2">Set Your Preferences</h3>
+                        <p className="text-sm text-white/70">Choose your country for holiday-aware content and select your brand voice</p>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <CountrySelectorCompact
+                          selectedCountry={selectedCountry}
+                          onCountryChange={setSelectedCountry}
+                          disabled={loading}
+                        />
+                        <BrandToneSelectorCompact
+                          selectedTone={selectedTone}
+                          onToneChange={setSelectedTone}
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 4: Results */}
+                  {currentStep === 'results' && result?.weekly_calendar && (
+                    <div className="space-y-6">
+                      <WeeklyCalendar
+                        calendar={result.weekly_calendar}
+                        onCopyPost={(post) => {
+                          navigator.clipboard.writeText(post.caption_text);
+                          setCopiedCaption(post.id);
+                          setTimeout(() => setCopiedCaption(null), 2000);
+                        }}
+                      />
+                      
+                      {weekNumber === 1 && (
+                        <div className="text-center">
+                          <Button
+                            onClick={handleGenerateWeek2}
+                            disabled={loading}
+                            className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300"
+                          >
+                            {loading ? 'Generating...' : 'Generate Next Week →'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error Display */}
                   {error && (
                     <div className="text-red-300 text-sm bg-red-500/20 backdrop-blur-sm p-4 rounded-xl border border-red-500/30">
                       {error}
                     </div>
                   )}
 
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={() => handleGenerate(false)}
-                      disabled={loading || !url.trim()}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-14 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                      size="lg"
-                    >
-                      {loading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Generating...
-                        </div>
-                      ) : (
-                        'Generate Preview Captions ✨'
-                      )}
-                    </Button>
-                    
-                    <Button
-                      onClick={() => handleGenerate(false, true)}
-                      disabled={loading || !url.trim()}
-                      variant="outline"
-                      className="bg-slate-700/50 backdrop-blur-sm border-slate-600/50 text-white hover:bg-slate-700/70 hover:border-amber-400 transition-all duration-300 h-14 px-4 rounded-xl"
-                      size="lg"
-                      title="Force refresh data from Shopify"
-                    >
-                      🔄
-                    </Button>
-                  </div>
+                  {/* Navigation Buttons */}
+                  {currentStep !== 'results' && (
+                    <div className="flex items-center justify-between pt-6">
+                      {currentStep !== 'url' ? (
+                        <Button
+                          onClick={handlePrevStep}
+                          disabled={loading}
+                          className="bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-6 rounded-xl border border-white/20 transition-all duration-300"
+                        >
+                          ← Back
+                        </Button>
+                      ) : <div />}
+                      
+                      <Button
+                        onClick={handleNextStep}
+                        disabled={loading}
+                        className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300"
+                      >
+                        {loading ? (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>
+                              {currentStep === 'url' ? 'Loading Products...' : 
+                               currentStep === 'preferences' ? 'Generating Calendar...' : 
+                               'Processing...'}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            {currentStep === 'url' ? 'Load Products' :
+                             currentStep === 'products' ? 'Set Preferences' :
+                             currentStep === 'preferences' ? 'Generate Calendar' : 'Next'}
+                            {currentStep !== 'preferences' && ' →'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
                 </div>
               </div>
 
-              {/* Results Section */}
-              {result && (
-                <div className="bg-white rounded-2xl p-6 mb-12 max-w-4xl mx-auto border border-gray-200 shadow-sm">
-                  <div className="mb-6">
-                    <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                      Results for {result.store_name}
-                    </h3>
-                  </div>
-
-                  {/* Product and Style Selection - Always Visible */}
-                  <div className="mb-6">
-                    {/* Product Selection */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Product:</label>
-                      <select 
-                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 focus:border-blue-500 focus:outline-none transition-colors"
-                        value={selectedProduct?.id || ''}
-                        onChange={(e) => handleProductChange(e.target.value)}
-                      >
-                        <option value="">Select a product...</option>
-                        {result.products?.map(product => {
-                          // Detect currency from price string
-                          const currency = product.price.includes('₹') ? '₹' : 
-                                         product.price.includes('$') ? '$' : 
-                                         product.price.includes('€') ? '€' : 
-                                         product.price.includes('£') ? '£' : '';
-                          const cleanPrice = product.price.replace(/[₹$€£]/g, '');
-                          
-                          return (
-                            <option key={product.id} value={product.id}>
-                              {product.name} - {currency}{cleanPrice}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                  
-                    {/* Style Selection */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Caption Styles:</label>
-                      <div 
-                        className="w-full bg-white border border-gray-300 text-gray-900 rounded-lg h-10 px-3 flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors"
-                        onClick={() => setShowStyleSelection(!showStyleSelection)}
-                      >
-                        <span>{selectedStyles.length} caption styles selected</span>
-                        <span className="text-gray-400">{showStyleSelection ? '▲' : '▼'}</span>
-                      </div>
-                      
-                      {showStyleSelection && (
-                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border">
-                          {CAPTION_STYLES.map((style) => (
-                            <div key={style.id} className="space-y-1">
-                              <Checkbox
-                                id={style.id}
-                                checked={selectedStyles.includes(style.id)}
-                                onChange={() => handleStyleToggle(style.id)}
-                                label={`${style.emoji} ${style.name}`}
-                              />
-                              <p className="text-xs text-gray-600 ml-6">{style.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-
-                  {/* Captions Display */}
-                  {(() => {
-                    const captionsToShow = showFullCaptions ? allCaptions : (result.preview_captions || result.captions || []);
-                    console.log('Captions to show:', captionsToShow, 'showFullCaptions:', showFullCaptions, 'allCaptions:', allCaptions, 'preview_captions:', result.preview_captions);
-                    return captionsToShow.length > 0 ? (
-                      <div className="space-y-3">
-                        <h4 className="font-medium text-gray-900 mb-3">Generated Captions:</h4>
-                        {captionsToShow.map((caption, index) => {
-                      const styleInfo = CAPTION_STYLES.find(s => s.id === caption.caption_style);
-                      const styleDisplay = caption.caption_style
-                        .replace(/_/g, ' ')
-                        .replace(/\b\w/g, (l: string) => l.toUpperCase());
-
-                      return (
-                        <div key={index} className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{styleInfo?.emoji || '✨'}</span>
-                              <h5 className="font-medium text-gray-900 text-sm">{styleDisplay}</h5>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => copyToClipboard(caption.caption_text)}
-                              className={`border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors rounded px-2 py-1 text-xs ${
-                                copiedCaption === caption.caption_text 
-                                  ? 'bg-green-50 border-green-200 text-green-700' 
-                                  : ''
-                              }`}
-                            >
-                              {copiedCaption === caption.caption_text ? '✓' : 'Copy'}
-                            </Button>
-                          </div>
-                          <p className="text-gray-800 text-sm leading-relaxed mb-1">
-                            {caption.caption_text}
-                          </p>
-                          {styleInfo && (
-                            <div className="text-xs text-gray-500">
-                              <span className="font-medium">Best for:</span> {styleInfo.description}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                      </div>
-                    ) : null;
-                  })()}
-
-                  {/* Action Buttons */}
-                  <div className="mt-6 flex justify-center gap-3">
-                    {result.captions && (
-                      <Button
-                        onClick={exportToCSV}
-                        variant="outline"
-                        className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                      >
-                        Export to CSV
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {/* View All 7 Styles Button - only for preview captions */}
-                  {result.preview_captions && result.preview_captions.length > 0 && !showFullCaptions && (
-                    <div className="mt-4">
-                      <div className="text-center">
-                        <Button
-                          onClick={handleViewAllStyles}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-medium h-10 px-4 rounded-lg transition-colors"
-                        >
-                          View All 7 Caption Styles
-                        </Button>
-                      </div>
-                      
-                      {/* Email Form - simple inline */}
-                      {showEmailForm && (
-                        <div className="mt-3 space-y-2">
-                          <Input
-                            type="email"
-                            placeholder="your@email.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="w-full h-9 px-3 text-sm"
-                            disabled={loading}
-                          />
-                          <Button
-                            onClick={handleEmailSubmit}
-                            disabled={loading || !email.trim() || selectedStyles.length === 0 || !selectedProduct}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm"
-                          >
-                            {loading ? 'Generating...' : `Generate All Styles`}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Demo Preview */}
               <div className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-3xl" />
                 <div className="relative text-left">
-                  <div className="text-sm text-white/60 mb-6 text-center">✨ Example captions for: Organic Cotton T-Shirt</div>
+                  <div className="text-sm text-white/60 mb-6 text-center">📅 Example week for: Organic Cotton T-Shirt Store</div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-indigo-400">
                         <div className="flex items-center gap-2 mb-2">
-                          <span>✨</span>
-                          <strong className="text-indigo-300">Product Showcase</strong>
+                          <span>📅</span>
+                          <strong className="text-indigo-300">Monday - Product Showcase</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;New arrival alert! 🌟 Our organic cotton tee in forest green is here. Soft, sustainable, perfect for any season.&rdquo;</p>
+                        <p className="text-white/90">&ldquo;New week, new comfort! 🌟 Our organic cotton tees are perfect for Monday motivation. Soft, sustainable, stylish.&rdquo;</p>
                       </div>
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-green-400">
                         <div className="flex items-center gap-2 mb-2">
                           <span>🎯</span>
-                          <strong className="text-green-300">Benefits-Focused</strong>
+                          <strong className="text-green-300">Tuesday - Benefits Focus</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;Why choose organic cotton? Breathable, hypoallergenic, and eco-friendly. Your skin will thank you.&rdquo;</p>
+                        <p className="text-white/90">&ldquo;Tuesday Truth: Organic cotton is breathable, hypoallergenic, and eco-friendly. Your skin will thank you! 🌱&rdquo;</p>
                       </div>
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-yellow-400">
                         <div className="flex items-center gap-2 mb-2">
                           <span>⭐</span>
-                          <strong className="text-yellow-300">Social Proof</strong>
+                          <strong className="text-yellow-300">Wednesday - Social Proof</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best t-shirt I&apos;ve ever owned!&rsquo; - Sarah M. Absolutely love it!&rdquo;</p>
+                        <p className="text-white/90">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best investment for my wardrobe!&rsquo; - Sarah M. Join hundreds of happy customers! 💛&rdquo;</p>
                       </div>
                     </div>
                     <div className="space-y-3">
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-purple-400">
                         <div className="flex items-center gap-2 mb-2">
                           <span>👕</span>
-                          <strong className="text-purple-300">How-to-Style</strong>
+                          <strong className="text-purple-300">Thursday - Style Tips</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;Style tip: Pair with high-waisted jeans and sneakers for the perfect casual look.&rdquo;</p>
+                        <p className="text-white/90">&ldquo;Thursday styling: Layer your organic tee under a blazer for that perfect work-to-weekend transition! ✨&rdquo;</p>
                       </div>
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-orange-400">
                         <div className="flex items-center gap-2 mb-2">
-                          <span>🔥</span>
-                          <strong className="text-orange-300">Call-to-Action</strong>
+                          <span>🎉</span>
+                          <strong className="text-orange-300">Friday - Holiday Aware</strong>
                         </div>
-                        <p className="text-white/90">&ldquo;Limited stock alert! Only 15 left in your size. Don&apos;t miss out on ultimate comfort.&rdquo;</p>
+                        <p className="text-white/90">&ldquo;Friday feeling + Earth Day vibes! 🌍 Our organic cotton celebrates sustainable fashion. Perfect timing!&rdquo;</p>
                       </div>
                       <div className="text-center text-white/60 text-sm p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-                        + 2 more caption styles<br/>
-                        <span className="text-xs">(Behind-the-scenes, Problem/Solution)</span>
+                        + Weekend content<br/>
+                        <span className="text-xs">(Behind-the-scenes, Call-to-action)</span>
                       </div>
                     </div>
                   </div>
@@ -634,8 +531,8 @@ export default function HomePage() {
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
                     <span className="text-white text-2xl">📈</span>
                   </div>
-                  <h3 className="font-bold text-xl mb-4 text-white">7 Caption Styles</h3>
-                  <p className="text-white/70 leading-relaxed">Product showcase, benefits, social proof, how-to, and more. Every style optimized for engagement.</p>
+                  <h3 className="font-bold text-xl mb-4 text-white">7-Day Strategic Planning</h3>
+                  <p className="text-white/70 leading-relaxed">Holiday-aware weekly calendars with strategic content rotation. Never run out of post ideas again.</p>
                 </div>
               </div>
             </div>
@@ -650,22 +547,22 @@ export default function HomePage() {
                 <div className="flex items-center gap-8 group">
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">1</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">Paste Your Shopify URL</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Enter your store URL (e.g., mystore.myshopify.com) and we&apos;ll automatically extract your products</p>
+                    <h3 className="font-bold text-2xl mb-2 text-white">Enter Store & Select Country</h3>
+                    <p className="text-white/70 text-lg leading-relaxed">Enter your Shopify URL and choose your country (US/UK/India) for holiday-aware content generation</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-8 group">
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">2</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">See Preview Captions</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Get 3 high-quality sample captions instantly to see the AI magic in action</p>
+                    <h3 className="font-bold text-2xl mb-2 text-white">Choose Products & Brand Tone</h3>
+                    <p className="text-white/70 text-lg leading-relaxed">Select 3-10 products to feature and pick your brand tone (Professional, Casual, Playful, or Luxury)</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-8 group">
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">3</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">Get All 7 Caption Styles</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Access all caption styles and export them as CSV for easy scheduling across platforms</p>
+                    <h3 className="font-bold text-2xl mb-2 text-white">Get Your 7-Day Calendar</h3>
+                    <p className="text-white/70 text-lg leading-relaxed">Receive a complete week of holiday-aware posts with strategic content rotation and export as CSV</p>
                   </div>
                 </div>
               </div>
@@ -676,9 +573,9 @@ export default function HomePage() {
           <section className="relative px-4 lg:px-6 py-32 bg-gradient-to-br from-slate-900 to-slate-800">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-blue-900/15 via-transparent to-transparent" />
             <div className="relative max-w-6xl mx-auto">
-              <h2 className="text-4xl font-bold text-center mb-6 text-white">7 Powerful Caption Styles</h2>
+              <h2 className="text-4xl font-bold text-center mb-6 text-white">7-Day Content Strategy</h2>
               <p className="text-center text-white/70 mb-16 text-lg max-w-3xl mx-auto">
-                Each style is designed to achieve different marketing goals. Use them strategically to maximize engagement and conversions.
+                Each day features strategic post types designed to achieve different marketing goals. Holiday-aware content keeps you relevant year-round.
               </p>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-6 border border-white/20 hover:bg-white/20 transition-all duration-300">
@@ -805,13 +702,13 @@ export default function HomePage() {
                       <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs">✓</span>
                       </div>
-                      3 preview captions per store
+                      7-day calendar preview per store
                     </li>
                     <li className="flex items-center gap-3">
                       <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs">✓</span>
                       </div>
-                      All 7 caption styles with email
+                      Full 7-day calendar with email
                     </li>
                     <li className="flex items-center gap-3">
                       <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
@@ -857,8 +754,8 @@ export default function HomePage() {
                   <div className="relative">
                     <h3 className="text-xl font-semibold text-white mb-4">How does StoreCalendar work?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      Simply paste your Shopify store URL, and our AI analyzes your products to generate 7 different caption styles. 
-                      You get 3 preview captions instantly, and can unlock all 7 styles by providing your email address.
+                      Enter your Shopify store URL, select your country, choose products and brand tone, then get a complete 7-day holiday-aware social media calendar. 
+                      You get a calendar preview instantly, and can unlock the full calendar by providing your email address.
                     </p>
                   </div>
                 </div>
@@ -877,9 +774,9 @@ export default function HomePage() {
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-2xl" />
                   <div className="relative">
-                    <h3 className="text-xl font-semibold text-white mb-4">Is there a limit to how many captions I can generate?</h3>
+                    <h3 className="text-xl font-semibold text-white mb-4">Is there a limit to how many calendars I can generate?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      You can generate up to 10 caption sets per day for free. Each set includes captions for up to 3 products from your store. 
+                      You can generate up to 10 weekly calendars per day for free. Each calendar includes 7 days of strategic posts featuring 3-10 products from your store. 
                       Need more? Contact us for custom plans tailored to your needs.
                     </p>
                   </div>
@@ -935,7 +832,7 @@ export default function HomePage() {
                 className="bg-white text-blue-600 hover:bg-white/90 px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                 onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
               >
-                Start Generating Captions ✨
+                Start Creating Calendars ✨
               </Button>
             </div>
           </section>

@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
-import { ShopifyProduct, CaptionStyle } from '@/types';
+import { ShopifyProduct, CaptionStyle, BrandTone, CountryCode, Holiday } from '@/types';
 import { supabase } from './supabase';
+import { getBrandTonePrompt } from './brand-tones';
+import { getUpcomingHolidays } from './holidays';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -49,7 +51,9 @@ export async function generateCaptions(
   products: ShopifyProduct[],
   storeName: string,
   styles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[],
-  storeId?: string
+  storeId?: string,
+  brandTone: BrandTone = 'casual',
+  country: CountryCode = 'US'
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   
   const results = [];
@@ -61,6 +65,15 @@ export async function generateCaptions(
     let completion: OpenAI.ChatCompletion;
     
     try {
+      // Get brand tone guidance
+      const brandToneGuidance = getBrandTonePrompt(brandTone);
+      
+      // Get upcoming holidays for context
+      const upcomingHolidays = getUpcomingHolidays(country, 14); // Next 2 weeks
+      const holidayContext = upcomingHolidays.length > 0 
+        ? `\n\nUpcoming holidays to consider (optional, only if relevant): ${upcomingHolidays.slice(0, 3).map(h => `${h.name} (${h.date})`).join(', ')}`
+        : '';
+      
       // Create style descriptions for the prompt
       const styleDescriptions = styles.map(style => `
 ${style.toUpperCase().replace('_', ' ')}: ${CAPTION_STYLES[style]}`).join('');
@@ -68,17 +81,23 @@ ${style.toUpperCase().replace('_', ' ')}: ${CAPTION_STYLES[style]}`).join('');
       const prompt = `
 You are a social media expert creating content for "${storeName}".
 
+${brandToneGuidance}${holidayContext}
+
 Product: ${product.name}
 Description: ${product.description}
-Price: $${product.price}
+Price: ${product.price}
+${product.url ? `Product URL: ${product.url}` : ''}
 
 Generate ${styles.length} different social media captions for this product using these styles:${styleDescriptions}
 
 For each caption:
-- Keep it 150-280 characters (Instagram/Twitter friendly)
+- Follow the ${brandTone} brand tone guidelines above
+- Keep main text 150-280 characters (Instagram/Twitter friendly)
 - Include 2-3 relevant hashtags max
 - Make it sound natural and engaging
 - Include product name naturally
+- If relevant, subtly reference upcoming holidays (don't force it)
+- Always end with a call-to-action link: "\\n\\n🛒 Shop now: [product URL]" if URL is available
 
 Return ONLY a JSON object with this exact format:
 {
@@ -194,9 +213,11 @@ Return only the JSON, no additional text or formatting.
 export async function generateAllCaptions(
   products: ShopifyProduct[],
   storeName: string,
-  storeId?: string
+  storeId?: string,
+  brandTone: BrandTone = 'casual',
+  country: CountryCode = 'US'
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   // Generate ALL 7 caption styles upfront
   const allStyles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[];
-  return generateCaptions(products.slice(0, 1), storeName, allStyles, storeId); // Only first product, ALL 7 styles
+  return generateCaptions(products.slice(0, 1), storeName, allStyles, storeId, brandTone, country); // Only first product, ALL 7 styles
 }

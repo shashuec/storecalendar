@@ -1,16 +1,17 @@
-import { ShopifyProduct } from '@/types';
+import { ShopifyProduct, ShopifyProductEnhanced } from '@/types';
 
-export async function scrapeShopifyStore(url: string): Promise<{
+export async function scrapeShopifyStore(url: string, limit: number = 50): Promise<{
   storeName: string;
-  products: ShopifyProduct[];
+  products: ShopifyProductEnhanced[];
 }> {
   try {
     // Normalize URL
     const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     const shopifyUrl = `https://${cleanUrl}`;
     
-    // Fetch products.json (Shopify's public API)
-    const productsResponse = await fetch(`${shopifyUrl}/products.json?limit=10`);
+    // Fetch products.json with higher limit (max 250 per request)
+    const requestLimit = Math.min(limit, 250);
+    const productsResponse = await fetch(`${shopifyUrl}/products.json?limit=${requestLimit}`);
     
     if (!productsResponse.ok) {
       if (productsResponse.status === 404) {
@@ -31,19 +32,31 @@ export async function scrapeShopifyStore(url: string): Promise<{
     // Extract store name from first request or use domain
     const storeName = cleanUrl.split('.')[0] || 'Store';
     
-    // Transform products
-    const products: ShopifyProduct[] = productsData.products.slice(0, 10).map((product: {
+    // Transform products with enhanced metadata
+    const products: ShopifyProductEnhanced[] = productsData.products.slice(0, limit).map((product: {
       id: number;
       title: string;
+      handle?: string;
       body_html?: string;
-      variants: Array<{ price: string }>;
+      variants: Array<{ price: string; inventory_quantity?: number }>;
       images: Array<{ src: string }>;
-    }) => ({
+      product_type?: string;
+      vendor?: string;
+      tags?: string;
+      created_at?: string;
+    }, index: number) => ({
       id: product.id.toString(),
       name: product.title,
       description: product.body_html?.replace(/<[^>]*>/g, '').substring(0, 200) || '',
       price: product.variants[0]?.price || '0',
-      image_url: product.images[0]?.src || ''
+      image_url: product.images[0]?.src || '',
+      url: `https://${cleanUrl}/products/${product.handle || product.id}`,
+      // Enhanced fields
+      selected: false, // Default unselected
+      rank: index + 1, // Position in original list (for ranking)
+      product_type: product.product_type || 'General',
+      vendor: product.vendor || '',
+      tags: product.tags && typeof product.tags === 'string' ? product.tags.split(',').map(tag => tag.trim()) : []
     }));
     
     return {

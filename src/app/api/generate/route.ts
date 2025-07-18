@@ -3,12 +3,26 @@ import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
 import { generateAllCaptions } from '@/lib/openai';
 import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
-import { GenerationResponse } from '@/types';
+import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced } from '@/types';
+import { isValidCountryCode } from '@/lib/country-detection';
+import { isValidBrandTone } from '@/lib/brand-tones';
+import { smartSelectProducts } from '@/lib/product-ranking';
+import { generateWeeklyCalendar } from '@/lib/calendar-generation';
+import { getUpcomingHolidays } from '@/lib/holidays';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { shopify_url, email, force_refresh } = body;
+    const { 
+      shopify_url, 
+      email, 
+      force_refresh,
+      // V1 additions
+      country,
+      selected_products,
+      brand_tone,
+      week_number
+    } = body;
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -24,6 +38,35 @@ export async function POST(request: NextRequest) {
           success: false, 
           error: 'Please enter a valid URL (e.g., shop.myshopify.com or yourcustomdomain.com)' 
         },
+        { status: 400 }
+      );
+    }
+
+    // Validate V1 parameters
+    if (country && !isValidCountryCode(country)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid country code. Must be US, UK, or IN' },
+        { status: 400 }
+      );
+    }
+
+    if (brand_tone && !isValidBrandTone(brand_tone)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid brand tone. Must be professional, casual, playful, or luxury' },
+        { status: 400 }
+      );
+    }
+
+    if (selected_products && (!Array.isArray(selected_products) || selected_products.length < 3 || selected_products.length > 10)) {
+      return NextResponse.json(
+        { success: false, error: 'Selected products must be an array of 3-10 product IDs' },
+        { status: 400 }
+      );
+    }
+
+    if (week_number && (week_number !== 1 && week_number !== 2)) {
+      return NextResponse.json(
+        { success: false, error: 'Week number must be 1 or 2' },
         { status: 400 }
       );
     }
@@ -79,8 +122,8 @@ export async function POST(request: NextRequest) {
     if (needsFreshData) {
       console.log(force_refresh ? 'Force refresh requested' : 'Cache miss or expired - scraping fresh data');
       
-      // Scrape fresh data from Shopify
-      const scrapedData = await scrapeShopifyStore(shopify_url);
+      // Scrape fresh data from Shopify (fetch up to 50 products for V1)
+      const scrapedData = await scrapeShopifyStore(shopify_url, 50);
       storeName = scrapedData.storeName;
       products = scrapedData.products;
       
@@ -132,7 +175,7 @@ export async function POST(request: NextRequest) {
         console.log('No cached products found - falling back to scraping');
         
         // Fallback to scraping if no cached products
-        const scrapedData = await scrapeShopifyStore(shopify_url);
+        const scrapedData = await scrapeShopifyStore(shopify_url, 50);
         storeName = scrapedData.storeName;
         products = scrapedData.products;
         
@@ -143,13 +186,19 @@ export async function POST(request: NextRequest) {
           );
         }
       } else {
-        // Transform cached products to match expected format
-        products = cachedProducts.map(p => ({
+        // Transform cached products to match expected format with enhanced fields
+        products = cachedProducts.map((p, index) => ({
           id: p.shopify_product_id,
           name: p.product_name,
           description: p.description || '',
           price: p.price || '0',
-          image_url: p.image_url || ''
+          image_url: p.image_url || '',
+          // Enhanced fields for V1 (use stored data if available)
+          selected: false,
+          rank: index + 1,
+          product_type: p.product_type || 'General',
+          vendor: p.vendor || '',
+          tags: p.tags || []
         }));
       }
     }
@@ -163,7 +212,11 @@ export async function POST(request: NextRequest) {
         description: product.description,
         price: product.price,
         image_url: product.image_url,
-        shopify_product_id: product.id
+        shopify_product_id: product.id,
+        // V1 enhanced fields
+        product_type: product.product_type || 'General',
+        vendor: product.vendor || '',
+        tags: product.tags || []
       }));
       
       const { data: freshProductData, error: productError } = await supabase
@@ -187,14 +240,56 @@ export async function POST(request: NextRequest) {
         .eq('store_id', storeData.id);
       
       productData = existingProductData;
+      
+      // Add url field to existing products for compatibility
+      if (existingProductData) {
+        const shopifyDomain = storeData.shopify_url.replace(/^https?:\/\//, '').split('/')[0];
+        products = existingProductData.map(dbProduct => ({
+          id: dbProduct.shopify_product_id,
+          name: dbProduct.product_name,
+          description: dbProduct.description || '',
+          price: dbProduct.price || '0',
+          image_url: dbProduct.image_url || '',
+          url: `https://${shopifyDomain}/products/${dbProduct.shopify_product_id}`,
+          selected: false,
+          rank: dbProduct.ranking_score || 0,
+          product_type: dbProduct.product_type || 'General',
+          vendor: dbProduct.vendor || '',
+          tags: dbProduct.tags || []
+        })) as ShopifyProductEnhanced[];
+      }
     }
     
+    // Apply product selection and ranking for V1
+    let finalProducts: ShopifyProductEnhanced[] = products as ShopifyProductEnhanced[];
+    if (selected_products && selected_products.length > 0) {
+      // Filter to selected products only
+      finalProducts = (products as ShopifyProductEnhanced[]).filter(p => selected_products.includes(p.id));
+    } else {
+      // Use smart auto-selection (top 5 products) - only if we have enhanced products
+      if (products.length > 0 && products[0].hasOwnProperty('rank')) {
+        finalProducts = smartSelectProducts(products as ShopifyProductEnhanced[], 5).filter(p => p.selected);
+      } else {
+        // For basic products, just take first 5
+        finalProducts = (products as ShopifyProductEnhanced[]).slice(0, 5);
+      }
+    }
+
     // Generate ALL 7 captions upfront (no email needed initially)
     let captionResults;
     
     if (!email) {
       // No email - generate all captions but mark as preview
-      captionResults = await generateAllCaptions(products, storeName, storeData.id);
+      const countryParam: CountryCode = country || 'US';
+      const toneParam: BrandTone = brand_tone || 'casual';
+      
+      captionResults = await generateAllCaptions(
+        finalProducts, 
+        storeName, 
+        storeData.id, 
+        toneParam, 
+        countryParam
+      );
       
       // Check if caption generation failed
       if (!captionResults || captionResults.length === 0 || captionResults[0]?.captions?.length === 0) {
@@ -246,11 +341,72 @@ export async function POST(request: NextRequest) {
           .insert(captionsToInsert);
       }
     }
+
+    // Generate weekly calendar for V1
+    const countryParam: CountryCode = country || 'US';
+    const toneParam: BrandTone = brand_tone || 'casual';
+    const weekParam: 1 | 2 = week_number || 1;
+
+    const weeklyCalendar = await generateWeeklyCalendar(
+      finalProducts,
+      storeName,
+      countryParam,
+      toneParam,
+      weekParam,
+      storeData.id
+    );
+
+    // Store the weekly calendar in database for V1
+    if (weeklyCalendar) {
+      try {
+        const { data: calendarData, error: calendarError } = await supabase
+          .from('calendar_weekly_calendars')
+          .insert({
+            store_id: storeData.id,
+            week_number: weekParam,
+            start_date: weeklyCalendar.start_date,
+            end_date: weeklyCalendar.end_date,
+            country_code: countryParam,
+            brand_tone: toneParam,
+            selected_products: finalProducts.map(p => p.id),
+            calendar_data: weeklyCalendar
+          })
+          .select()
+          .single();
+
+        if (calendarError) {
+          console.error('Calendar storage error:', calendarError);
+          // Continue anyway - don't fail the request
+        } else if (calendarData) {
+          // Store individual posts for easier querying
+          const postsToInsert = weeklyCalendar.posts.map(post => ({
+            calendar_id: calendarData.id,
+            store_id: storeData.id,
+            product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
+            day_name: post.day,
+            post_date: post.date,
+            post_type: post.post_type,
+            caption_text: post.caption_text,
+            holiday_context: post.holiday_context || null
+          }));
+
+          await supabase
+            .from('calendar_posts')
+            .insert(postsToInsert);
+        }
+      } catch (error) {
+        console.error('Calendar persistence error:', error);
+        // Continue anyway - don't fail the request
+      }
+    }
+
+    // Get upcoming holidays for context
+    const upcomingHolidays = getUpcomingHolidays(countryParam, 14);
     
     const response: GenerationResponse = {
       success: true,
       store_name: storeName,
-      products,
+      products: finalProducts, // Return the final selected products
       all_captions: captionResults.flatMap(result => 
         result.captions.map(caption => ({
           id: '', // Will be filled from DB if needed
@@ -260,7 +416,11 @@ export async function POST(request: NextRequest) {
           created_at: new Date().toISOString()
         }))
       ),
-      requires_email: true // Always true initially, UI will handle preview vs full
+      requires_email: true, // Always true initially, UI will handle preview vs full
+      // V1 additions
+      enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection UI
+      weekly_calendar: weeklyCalendar,
+      upcoming_holidays: upcomingHolidays
     };
     
     return NextResponse.json(response);

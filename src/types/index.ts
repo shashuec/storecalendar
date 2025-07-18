@@ -4,6 +4,7 @@ export interface ShopifyProduct {
   description: string;
   price: string;
   image_url: string;
+  url: string;
 }
 
 export interface Store {
@@ -31,10 +32,66 @@ export type CaptionStyle =
   | 'behind_scenes'
   | 'call_to_action';
 
+// Holiday system types
+export type CountryCode = 'US' | 'UK' | 'IN';
+
+export type HolidayType = 
+  | 'celebration' 
+  | 'gift-giving' 
+  | 'shopping' 
+  | 'patriotic' 
+  | 'festival' 
+  | 'seasonal' 
+  | 'environmental';
+
+export interface Holiday {
+  date: string; // YYYY-MM-DD format
+  name: string;
+  type: HolidayType;
+}
+
+// Brand tone types
+export type BrandTone = 'professional' | 'casual' | 'playful' | 'luxury';
+
+// Enhanced product interface
+export interface ShopifyProductEnhanced extends ShopifyProduct {
+  selected?: boolean;
+  rank?: number;
+  product_type?: string;
+  vendor?: string;
+  tags?: string[];
+}
+
+// Weekly calendar types
+export interface CalendarPost {
+  id: string;
+  day: string; // Monday, Tuesday, etc.
+  date: string; // YYYY-MM-DD
+  post_type: string; // Product Showcase, Testimonial, etc.
+  caption_text: string;
+  product_featured: ShopifyProduct;
+  holiday_context?: Holiday;
+}
+
+export interface WeeklyCalendar {
+  week_number: 1 | 2;
+  start_date: string;
+  end_date: string;
+  posts: CalendarPost[];
+  country: CountryCode;
+  brand_tone: BrandTone;
+  selected_products: ShopifyProduct[];
+}
+
 export interface GenerationRequest {
   shopify_url: string;
   email?: string;
   selected_styles?: CaptionStyle[];
+  // V1 additions
+  country?: CountryCode;
+  selected_products?: string[]; // Product IDs
+  brand_tone?: BrandTone;
+  week_number?: 1 | 2;
 }
 
 export interface GenerationResponse {
@@ -48,4 +105,8 @@ export interface GenerationResponse {
   requires_email?: boolean;
   email_stored?: boolean; // Flag when email is successfully stored
   message?: string;
+  // V1 additions
+  weekly_calendar?: WeeklyCalendar;
+  upcoming_holidays?: Holiday[];
+  enhanced_products?: ShopifyProductEnhanced[];
 }

@@ -1,0 +1,19 @@
+
+> storecalendar-app@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.4.1 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.3:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 764ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1714ms
+ GET / 200 in 1888ms
+ ✓ Compiled /api/generate in 228ms
+Cache hit - using existing data
+ POST /api/generate 200 in 48233ms
+Cache hit - using existing data
+ POST /api/generate 200 in 56061ms
