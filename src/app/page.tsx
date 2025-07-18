@@ -119,8 +119,8 @@ export default function HomePage() {
       }
       handleGenerate();
     } else if (currentStep === 'products') {
-      if (selectedProducts.length < 3) {
-        setError('Please select at least 3 products');
+      if (selectedProducts.length < 1) {
+        setError('Please select at least 1 product');
         return;
       }
       setCurrentStep('preferences');
@@ -555,7 +555,7 @@ export default function HomePage() {
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">2</div>
                   <div className="flex-1">
                     <h3 className="font-bold text-2xl mb-2 text-white">Choose Products & Brand Tone</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Select 3-10 products to feature and pick your brand tone (Professional, Casual, Playful, or Luxury)</p>
+                    <p className="text-white/70 text-lg leading-relaxed">Select 1-10 products to feature and pick your brand tone (Professional, Casual, Playful, or Luxury)</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-8 group">
@@ -776,7 +776,7 @@ export default function HomePage() {
                   <div className="relative">
                     <h3 className="text-xl font-semibold text-white mb-4">Is there a limit to how many calendars I can generate?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      You can generate up to 10 weekly calendars per day for free. Each calendar includes 7 days of strategic posts featuring 3-10 products from your store. 
+                      You can generate up to 10 weekly calendars per day for free. Each calendar includes 7 days of strategic posts featuring 1-10 products from your store. 
                       Need more? Contact us for custom plans tailored to your needs.
                     </p>
                   </div>

@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (selected_products && (!Array.isArray(selected_products) || selected_products.length < 3 || selected_products.length > 10)) {
+    if (selected_products && (!Array.isArray(selected_products) || selected_products.length < 1 || selected_products.length > 10)) {
       return NextResponse.json(
-        { success: false, error: 'Selected products must be an array of 3-10 product IDs' },
+        { success: false, error: 'Selected products must be an array of 1-10 product IDs' },
         { status: 400 }
       );
     }
@@ -269,10 +269,10 @@ export async function POST(request: NextRequest) {
     } else {
       // Use smart auto-selection (top 5 products) - only if we have enhanced products
       if (products.length > 0 && products[0].hasOwnProperty('rank')) {
-        finalProducts = smartSelectProducts(products as ShopifyProductEnhanced[], 5).filter(p => p.selected);
+        finalProducts = smartSelectProducts(products as ShopifyProductEnhanced[], Math.min(5, products.length)).filter(p => p.selected);
       } else {
-        // For basic products, just take first 5
-        finalProducts = (products as ShopifyProductEnhanced[]).slice(0, 5);
+        // For basic products, just take available products (up to 5)
+        finalProducts = (products as ShopifyProductEnhanced[]).slice(0, Math.min(5, products.length));
       }
     }
 
