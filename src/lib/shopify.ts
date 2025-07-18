@@ -5,9 +5,10 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
   products: ShopifyProductEnhanced[];
 }> {
   try {
-    // Normalize URL
+    // Normalize URL - remove protocol, trailing slash, and query parameters
     const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    const shopifyUrl = `https://${cleanUrl}`;
+    const domainPart = cleanUrl.split('?')[0].split('/')[0];
+    const shopifyUrl = `https://${domainPart}`;
     
     // Fetch products.json with higher limit (max 250 per request)
     const requestLimit = Math.min(limit, 250);
@@ -30,7 +31,7 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
     }
     
     // Extract store name from first request or use domain
-    const storeName = cleanUrl.split('.')[0] || 'Store';
+    const storeName = domainPart.split('.')[0] || 'Store';
     
     // Transform products with enhanced metadata
     const products: ShopifyProductEnhanced[] = productsData.products.slice(0, limit).map((product: {
@@ -50,7 +51,7 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
       description: product.body_html?.replace(/<[^>]*>/g, '').substring(0, 200) || '',
       price: product.variants[0]?.price || '0',
       image_url: product.images[0]?.src || '',
-      url: product.handle ? `https://${cleanUrl}/products/${product.handle}` : `https://${cleanUrl}/products/${product.id}`,
+      url: product.handle ? `https://${domainPart}/products/${product.handle}` : `https://${domainPart}/products/${product.id}`,
       handle: product.handle || '',
       // Enhanced fields
       selected: false, // Default unselected
@@ -74,14 +75,15 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
 export async function validateShopifyUrl(url: string): Promise<boolean> {
   try {
     const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const domainPart = cleanUrl.split('?')[0].split('/')[0];
     
     // Basic URL format validation
-    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanUrl)) {
+    if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domainPart)) {
       return false;
     }
     
     // Test if it's actually a Shopify store by checking products.json
-    const testUrl = `https://${cleanUrl}/products.json?limit=1`;
+    const testUrl = `https://${domainPart}/products.json?limit=1`;
     const response = await fetch(testUrl, { 
       method: 'HEAD', // Just check if endpoint exists
       signal: AbortSignal.timeout(5000) // 5 second timeout
@@ -98,9 +100,12 @@ export function validateShopifyUrlFormat(url: string): boolean {
   try {
     const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
     
+    // Extract just the domain part (before query parameters or paths)
+    const domainPart = cleanUrl.split('?')[0].split('/')[0];
+    
     // Accept any properly formatted domain
     // Could be .myshopify.com, custom domain, or any domain with Shopify
-    return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanUrl);
+    return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domainPart);
   } catch {
     return false;
   }
