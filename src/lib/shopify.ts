@@ -50,7 +50,8 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
       description: product.body_html?.replace(/<[^>]*>/g, '').substring(0, 200) || '',
       price: product.variants[0]?.price || '0',
       image_url: product.images[0]?.src || '',
-      url: `https://${cleanUrl}/products/${product.handle || product.id}`,
+      url: product.handle ? `https://${cleanUrl}/products/${product.handle}` : `https://${cleanUrl}/products/${product.id}`,
+      handle: product.handle || '',
       // Enhanced fields
       selected: false, // Default unselected
       rank: index + 1, // Position in original list (for ranking)

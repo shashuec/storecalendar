@@ -5,6 +5,7 @@ export interface ShopifyProduct {
   price: string;
   image_url: string;
   url: string;
+  handle?: string;
 }
 
 export interface Store {

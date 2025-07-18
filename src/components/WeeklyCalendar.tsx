@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { WeeklyCalendar as WeeklyCalendarType, CalendarPost, Holiday } from '@/types';
 
 interface WeeklyCalendarProps {
@@ -113,6 +114,62 @@ function PostCard({
         </div>
       </div>
 
+      {/* Product Image & Info */}
+      {post.product_featured.image_url && (
+        <div className="mb-3 flex items-start space-x-3">
+          {post.product_featured.url ? (
+            <a 
+              href={post.product_featured.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="shrink-0 group"
+            >
+              <Image 
+                src={post.product_featured.image_url} 
+                alt={post.product_featured.name}
+                width={64}
+                height={64}
+                className="w-16 h-16 object-cover rounded-lg border border-gray-200 group-hover:border-blue-300 transition-colors"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </a>
+          ) : (
+            <Image 
+              src={post.product_featured.image_url} 
+              alt={post.product_featured.name}
+              width={64}
+              height={64}
+              className="w-16 h-16 object-cover rounded-lg border border-gray-200 shrink-0"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-medium text-gray-900 truncate">
+              {post.product_featured.name}
+            </h4>
+            <p className="text-xs text-gray-500 mt-1">
+              {post.product_featured.price && `${post.product_featured.price}`}
+            </p>
+            {post.product_featured.url && (
+              <p className="text-xs text-blue-600 mt-1">
+                <a 
+                  href={post.product_featured.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  View Product →
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Caption Text */}
       <div className="mb-3">
         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">
@@ -196,6 +253,23 @@ export function WeeklyCalendar({
                     <div className="text-xs text-gray-500 mb-1">
                       {formatDate(post.date)}
                     </div>
+                    
+                    {/* Small product image preview */}
+                    {post.product_featured.image_url && (
+                      <div className="mb-2">
+                        <Image 
+                          src={post.product_featured.image_url} 
+                          alt={post.product_featured.name}
+                          width={32}
+                          height={32}
+                          className="w-8 h-8 object-cover rounded border border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    
                     <div className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${getPostTypeColor(post.post_type)}`}>
                       {post.post_type.split(' ')[0]}
                     </div>

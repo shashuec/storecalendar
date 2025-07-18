@@ -216,7 +216,8 @@ export async function POST(request: NextRequest) {
         // V1 enhanced fields
         product_type: product.product_type || 'General',
         vendor: product.vendor || '',
-        tags: product.tags || []
+        tags: product.tags || [],
+        handle: (product as ShopifyProductEnhanced).handle || ''
       }));
       
       const { data: freshProductData, error: productError } = await supabase
@@ -250,7 +251,7 @@ export async function POST(request: NextRequest) {
           description: dbProduct.description || '',
           price: dbProduct.price || '0',
           image_url: dbProduct.image_url || '',
-          url: `https://${shopifyDomain}/products/${dbProduct.shopify_product_id}`,
+          url: dbProduct.handle ? `https://${shopifyDomain}/products/${dbProduct.handle}` : `https://${shopifyDomain}/products/${dbProduct.shopify_product_id}`,
           selected: false,
           rank: dbProduct.ranking_score || 0,
           product_type: dbProduct.product_type || 'General',

@@ -7,7 +7,8 @@ ADD COLUMN IF NOT EXISTS product_type TEXT DEFAULT 'General',
 ADD COLUMN IF NOT EXISTS vendor TEXT DEFAULT '',
 ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS ranking_score DECIMAL(5,2) DEFAULT 0,
-ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
+ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS handle TEXT DEFAULT '';
 
 -- 2. Create calendar_weekly_calendars table for calendar persistence
 CREATE TABLE IF NOT EXISTS calendar_weekly_calendars (
