@@ -3,7 +3,7 @@ import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
 import { generateAllCaptions } from '@/lib/openai';
 import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
-import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced } from '@/types';
+import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced, CalendarPost } from '@/types';
 import { isValidCountryCode } from '@/lib/country-detection';
 import { isValidBrandTone } from '@/lib/brand-tones';
 import { smartSelectProducts } from '@/lib/product-ranking';
@@ -348,17 +348,53 @@ export async function POST(request: NextRequest) {
     const toneParam: BrandTone = brand_tone || 'casual';
     const weekParam: 1 | 2 = week_number || 1;
 
-    const weeklyCalendar = await generateWeeklyCalendar(
-      finalProducts,
-      storeName,
-      countryParam,
-      toneParam,
-      weekParam,
-      storeData.id
-    );
+    // Check if we have a cached calendar with the same parameters
+    const selectedProductIds = finalProducts.map(p => p.id).sort();
+    const { data: existingCalendar } = await supabase
+      .from('calendar_weekly_calendars')
+      .select('*')
+      .eq('store_id', storeData.id)
+      .eq('week_number', weekParam)
+      .eq('country_code', countryParam)
+      .eq('brand_tone', toneParam)
+      .gte('created_at', sixHoursAgo)
+      .single();
 
-    // Store the weekly calendar in database for V1
-    if (weeklyCalendar) {
+    let weeklyCalendar;
+    
+    if (existingCalendar && !force_refresh) {
+      // Check if selected products match
+      const cachedProductIds = (existingCalendar.selected_products as string[]).sort();
+      const productsMatch = JSON.stringify(selectedProductIds) === JSON.stringify(cachedProductIds);
+      
+      if (productsMatch) {
+        console.log('Calendar cache hit - using existing calendar');
+        weeklyCalendar = existingCalendar.calendar_data;
+      } else {
+        console.log('Calendar cache miss - product selection changed');
+        weeklyCalendar = await generateWeeklyCalendar(
+          finalProducts,
+          storeName,
+          countryParam,
+          toneParam,
+          weekParam,
+          storeData.id
+        );
+      }
+    } else {
+      console.log('Calendar cache miss - generating new calendar');
+      weeklyCalendar = await generateWeeklyCalendar(
+        finalProducts,
+        storeName,
+        countryParam,
+        toneParam,
+        weekParam,
+        storeData.id
+      );
+    }
+
+    // Store the weekly calendar in database for V1 (only if newly generated)
+    if (weeklyCalendar && !existingCalendar) {
       try {
         const { data: calendarData, error: calendarError } = await supabase
           .from('calendar_weekly_calendars')
@@ -380,7 +416,7 @@ export async function POST(request: NextRequest) {
           // Continue anyway - don't fail the request
         } else if (calendarData) {
           // Store individual posts for easier querying
-          const postsToInsert = weeklyCalendar.posts.map(post => ({
+          const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
             calendar_id: calendarData.id,
             store_id: storeData.id,
             product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
