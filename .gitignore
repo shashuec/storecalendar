@@ -46,4 +46,7 @@ dev.log
 
 # temporary files
 plan.txt
-*.md
+# Allow important documentation
+!docs/*.md
+!README.md
+!CLAUDE.md
