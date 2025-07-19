@@ -26,6 +26,17 @@ export default function HomePage() {
   
   // Copy state for calendar posts
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  
+  // Freemium usage tracking
+  const [dailyUsage, setDailyUsage] = useState<number>(0);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  
+  // Check usage on component mount
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const savedUsage = localStorage.getItem(`usage_${today}`);
+    setDailyUsage(savedUsage ? parseInt(savedUsage) : 0);
+  }, []);
 
   // Auto-select products when enhanced products are loaded
   useEffect(() => {
@@ -80,6 +91,18 @@ export default function HomePage() {
 
       if (data.success) {
         setResult(data);
+        
+        // Track usage for freemium model
+        if (currentStep === 'preferences') {
+          const today = new Date().toDateString();
+          const newUsage = dailyUsage + 1;
+          setDailyUsage(newUsage);
+          localStorage.setItem(`usage_${today}`, newUsage.toString());
+          
+          if (newUsage >= 3) {
+            setShowUpgradePrompt(true);
+          }
+        }
         
         // V1 flow: proceed to next step or show results
         if (currentStep === 'url' && data.enhanced_products) {
@@ -198,9 +221,9 @@ export default function HomePage() {
           <p className="text-xl text-white/70 mb-12 max-w-3xl mx-auto leading-relaxed">
             Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
           </p>
-          <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-8 max-w-2xl mx-auto border border-green-400/30">
-            <p className="text-green-300 font-semibold text-lg">🚀 Early Access: $29/month (First 100 customers get lifetime rate)</p>
-            <p className="text-white/80 text-sm mt-1">Regular pricing $39/month • WooCommerce coming Month 2</p>
+          <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-8 max-w-2xl mx-auto border border-blue-400/30">
+            <p className="text-blue-300 font-semibold text-lg">🎆 Free to start! Unlimited calendars coming soon at $29/month</p>
+            <p className="text-white/80 text-sm mt-1">Join the waitlist for premium features • WooCommerce coming Month 2</p>
           </div>
               
               {/* V1 Multi-Step Generator Form */}
@@ -284,6 +307,18 @@ export default function HomePage() {
                       <div className="text-center mb-4">
                         <h3 className="text-lg font-medium text-white mb-2">Set Your Preferences</h3>
                         <p className="text-sm text-white/70">Choose your country for holiday-aware content and select your brand voice</p>
+                        
+                        {/* Usage tracker */}
+                        <div className="mt-3 p-3 bg-blue-500/20 backdrop-blur-sm rounded-xl border border-blue-400/30">
+                          <p className="text-blue-300 text-sm font-semibold">
+                            Daily usage: {dailyUsage}/3 free calendars
+                          </p>
+                          {dailyUsage >= 2 && (
+                            <p className="text-yellow-300 text-xs mt-1">
+                              {dailyUsage === 2 ? '1 more free calendar today!' : 'Upgrade for unlimited calendars'}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="space-y-4">
@@ -695,24 +730,24 @@ export default function HomePage() {
           <section id="pricing" className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-slate-800 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/15 via-transparent to-transparent" />
             <div className="relative max-w-4xl mx-auto text-center">
-              <h2 className="text-4xl font-bold mb-6 text-white">Early Access Pricing</h2>
+              <h2 className="text-4xl font-bold mb-6 text-white">Simple Pricing</h2>
               <p className="text-white/70 mb-12 text-lg">
-                Limited time pricing for the first 100 customers. Lifetime rate guarantee.
+                Start free today. Upgrade to unlimited calendars when ready.
               </p>
               
               <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-                {/* Free Trial */}
-                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border border-white/20">
+                {/* Free Tier */}
+                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border-2 border-green-400">
                   <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-3xl" />
                   <div className="relative">
-                    <div className="text-4xl font-bold text-white mb-2">FREE TRIAL</div>
-                    <div className="text-white/70 mb-6">Try before you subscribe</div>
+                    <div className="text-5xl font-bold text-white mb-2">FREE</div>
+                    <div className="text-green-300 mb-6 font-semibold">Perfect for getting started</div>
                     <ul className="space-y-3 text-left text-white/80">
                       <li className="flex items-center gap-3">
                         <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">✓</span>
                         </div>
-                        3 calendar generations
+                        3 calendar generations per day
                       </li>
                       <li className="flex items-center gap-3">
                         <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
@@ -739,55 +774,55 @@ export default function HomePage() {
                         className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-semibold h-12 rounded-xl"
                         onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
                       >
-                        Start Free Trial ✨
+                        Start Free Now ✨
                       </Button>
                     </div>
                   </div>
                 </div>
 
-                {/* Early Access */}
-                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border-2 border-blue-400 relative">
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2 rounded-full text-sm font-bold">
-                    LIMITED TIME
+                {/* Premium Coming Soon */}
+                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border border-white/20 opacity-75 relative">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-bold">
+                    COMING SOON
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-3xl" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-3xl" />
                   <div className="relative">
                     <div className="text-5xl font-bold text-white mb-2">$29<span className="text-2xl">/month</span></div>
-                    <div className="text-blue-300 mb-2 font-semibold">Early Access (Lifetime Rate)</div>
-                    <div className="text-white/70 mb-6 text-sm">Regular price: $39/month</div>
+                    <div className="text-purple-300 mb-2 font-semibold">Premium (Early Access Rate)</div>
+                    <div className="text-white/70 mb-6 text-sm">Regular price will be $39/month</div>
                     <ul className="space-y-3 text-left text-white/80">
                       <li className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">✓</span>
                         </div>
                         Unlimited calendar generations
                       </li>
                       <li className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">✓</span>
                         </div>
                         Multiple store support
                       </li>
                       <li className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        AI image generation
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">✓</span>
                         </div>
                         Priority customer support
-                      </li>
-                      <li className="flex items-center gap-3">
-                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs">✓</span>
-                        </div>
-                        Early access to new platforms
                       </li>
                     </ul>
                     <div className="mt-8">
                       <Button 
                         size="lg" 
-                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-12 rounded-xl"
-                        onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold h-12 rounded-xl"
+                        disabled
                       >
-                        Get Early Access 🚀
+                        Join Waitlist 🔔
                       </Button>
                     </div>
                   </div>
@@ -795,11 +830,11 @@ export default function HomePage() {
               </div>
               
               <div className="mt-12 text-center">
-                <div className="bg-yellow-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-6 max-w-2xl mx-auto border border-yellow-400/30">
-                  <p className="text-yellow-300 font-semibold">⏰ Only 47 spots left at $29/month early access pricing</p>
+                <div className="bg-blue-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-6 max-w-2xl mx-auto border border-blue-400/30">
+                  <p className="text-blue-300 font-semibold">📅 Premium features launching soon! Join 200+ users already creating amazing content</p>
                 </div>
                 <p className="text-white/60 text-sm">
-                  Questions? <a href="mailto:connect@conversailabs.com" className="text-blue-400 hover:text-blue-300">Contact us</a> • Enterprise plans available
+                  Questions? <a href="mailto:connect@conversailabs.com" className="text-blue-400 hover:text-blue-300">Contact us</a> • Enterprise plans coming soon
                 </p>
               </div>
             </div>
@@ -837,11 +872,11 @@ export default function HomePage() {
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-2xl" />
                   <div className="relative">
-                    <h3 className="text-xl font-semibold text-white mb-4">What&apos;s included in the $29 early access pricing?</h3>
+                    <h3 className="text-xl font-semibold text-white mb-4">What&apos;s included in the free plan?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      Early access subscribers get unlimited calendar generations, multiple store support, priority customer support, and early access to new platforms like WooCommerce. 
-                      The $29/month rate is locked in for life for the first 100 customers. Regular pricing will be $39/month. 
-                      Free trial includes 3 calendar generations with no credit card required.
+                      The free plan includes 3 calendar generations per day, full 7-day strategic calendars, CSV export functionality, and access to all current features. 
+                      No credit card required. Premium plan (coming soon) will offer unlimited generations, multiple stores, AI image generation, and early access to new platforms. 
+                      Early premium subscribers will get $29/month lifetime rate (regular price $39/month).
                     </p>
                   </div>
                 </div>
@@ -953,13 +988,18 @@ export default function HomePage() {
               <p className="text-white/90 mb-12 text-xl leading-relaxed max-w-3xl mx-auto">
                 Join e-commerce stores already creating better content with AI. Start with Shopify today, expand to all platforms tomorrow.
               </p>
-              <Button 
-                size="lg" 
-                className="bg-white text-blue-600 hover:bg-white/90 px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-                onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
-              >
-                Start Creating Calendars ✨
-              </Button>
+              <div className="space-y-4">
+                <Button 
+                  size="lg" 
+                  className="bg-white text-blue-600 hover:bg-white/90 px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                  onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Start Free Today ✨
+                </Button>
+                <p className="text-white/80 text-lg">
+                  3 free calendars daily • No credit card • Premium coming soon
+                </p>
+              </div>
             </div>
           </section>
 
