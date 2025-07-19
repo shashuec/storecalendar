@@ -192,12 +192,16 @@ export default function HomePage() {
       <section className="relative px-4 lg:px-6 py-32">
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-8 leading-tight">
-            Turn Your Products Into 
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Weekly Content Gold</span>
+            E-commerce Content 
+            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Automation Platform</span>
           </h1>
           <p className="text-xl text-white/70 mb-12 max-w-3xl mx-auto leading-relaxed">
-            Create a week&apos;s worth of strategic posts in 60 seconds. Holiday-aware content that connects with your audience. Never run out of content ideas again.
+            Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
           </p>
+          <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-8 max-w-2xl mx-auto border border-green-400/30">
+            <p className="text-green-300 font-semibold text-lg">🚀 Early Access: $29/month (First 100 customers get lifetime rate)</p>
+            <p className="text-white/80 text-sm mt-1">Regular pricing $39/month • WooCommerce coming Month 2</p>
+          </div>
               
               {/* V1 Multi-Step Generator Form */}
               <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
@@ -241,7 +245,7 @@ export default function HomePage() {
                     <div className="space-y-6">
                       <div>
                         <label htmlFor="url" className="block text-sm font-medium text-white/90 mb-3">
-                          Enter Your Shopify Store URL
+                          Enter Your E-commerce Store URL
                         </label>
                         <Input
                           id="url"
@@ -252,6 +256,10 @@ export default function HomePage() {
                           className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-14 px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300"
                           disabled={loading}
                         />
+                        <div className="mt-2 text-center">
+                          <p className="text-white/60 text-sm">Currently supports Shopify • <span className="text-blue-400">WooCommerce coming soon</span></p>
+                          <a href="#waitlist" className="text-blue-400 hover:text-blue-300 text-sm underline">Join waitlist for your platform →</a>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -373,7 +381,7 @@ export default function HomePage() {
               <div className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-3xl" />
                 <div className="relative text-left">
-                  <div className="text-sm text-white/60 mb-6 text-center">📅 Example week for: Organic Cotton T-Shirt Store</div>
+                  <div className="text-sm text-white/60 mb-6 text-center">📅 Example week for: E-commerce Store (Organic Cotton T-Shirts)</div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-indigo-400">
@@ -434,8 +442,8 @@ export default function HomePage() {
                   <div className="text-white/70 text-sm">Powered</div>
                 </div>
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">50K+</div>
-                  <div className="text-white/70 text-sm">Captions Generated</div>
+                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">10K+</div>
+                  <div className="text-white/70 text-sm">Calendars Generated</div>
                 </div>
                 <div className="group">
                   <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">30 sec</div>
@@ -524,8 +532,8 @@ export default function HomePage() {
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
                     <span className="text-white text-2xl">🎯</span>
                   </div>
-                  <h3 className="font-bold text-xl mb-4 text-white">Shopify-Specific</h3>
-                  <p className="text-white/70 leading-relaxed">Built for Shopify stores. Uses your actual products and brand voice to create authentic, converting content.</p>
+                  <h3 className="font-bold text-xl mb-4 text-white">E-commerce Optimized</h3>
+                  <p className="text-white/70 leading-relaxed">Built for e-commerce stores. Starting with Shopify, expanding to all platforms. Uses your actual products and brand voice to create authentic, converting content.</p>
                 </div>
                 <div className="text-center group">
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
@@ -687,57 +695,111 @@ export default function HomePage() {
           <section id="pricing" className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-slate-800 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/15 via-transparent to-transparent" />
             <div className="relative max-w-4xl mx-auto text-center">
-              <h2 className="text-4xl font-bold mb-6 text-white">Simple, Transparent Pricing</h2>
+              <h2 className="text-4xl font-bold mb-6 text-white">Early Access Pricing</h2>
               <p className="text-white/70 mb-12 text-lg">
-                No subscriptions, no hidden fees. Pay only for what you use.
+                Limited time pricing for the first 100 customers. Lifetime rate guarantee.
               </p>
               
-              <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border border-white/20 max-w-md mx-auto">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-3xl" />
-                <div className="relative">
-                  <div className="text-6xl font-bold text-white mb-2">FREE</div>
-                  <div className="text-white/70 mb-6">Get started today</div>
-                  <ul className="space-y-3 text-left text-white/80">
-                    <li className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                      7-day calendar preview per store
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                      Full 7-day calendar with email
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                      CSV export for easy scheduling
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">✓</span>
-                      </div>
-                      10 generations per day
-                    </li>
-                  </ul>
-                  <div className="mt-8">
-                    <Button 
-                      size="lg" 
-                      className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-12 rounded-xl"
-                      onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
-                    >
-                      Start Free Now ✨
-                    </Button>
+              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                {/* Free Trial */}
+                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border border-white/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-3xl" />
+                  <div className="relative">
+                    <div className="text-4xl font-bold text-white mb-2">FREE TRIAL</div>
+                    <div className="text-white/70 mb-6">Try before you subscribe</div>
+                    <ul className="space-y-3 text-left text-white/80">
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        3 calendar generations
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        Full 7-day strategic calendar
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        CSV export functionality
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        No credit card required
+                      </li>
+                    </ul>
+                    <div className="mt-8">
+                      <Button 
+                        size="lg" 
+                        className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-semibold h-12 rounded-xl"
+                        onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
+                      >
+                        Start Free Trial ✨
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Early Access */}
+                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border-2 border-blue-400 relative">
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-6 py-2 rounded-full text-sm font-bold">
+                    LIMITED TIME
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-3xl" />
+                  <div className="relative">
+                    <div className="text-5xl font-bold text-white mb-2">$29<span className="text-2xl">/month</span></div>
+                    <div className="text-blue-300 mb-2 font-semibold">Early Access (Lifetime Rate)</div>
+                    <div className="text-white/70 mb-6 text-sm">Regular price: $39/month</div>
+                    <ul className="space-y-3 text-left text-white/80">
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        Unlimited calendar generations
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        Multiple store support
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        Priority customer support
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                        Early access to new platforms
+                      </li>
+                    </ul>
+                    <div className="mt-8">
+                      <Button 
+                        size="lg" 
+                        className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-12 rounded-xl"
+                        onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
+                      >
+                        Get Early Access 🚀
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
               
               <div className="mt-12 text-center">
+                <div className="bg-yellow-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-6 max-w-2xl mx-auto border border-yellow-400/30">
+                  <p className="text-yellow-300 font-semibold">⏰ Only 47 spots left at $29/month early access pricing</p>
+                </div>
                 <p className="text-white/60 text-sm">
-                  Need more? <a href="mailto:connect@conversailabs.com" className="text-blue-400 hover:text-blue-300">Contact us</a> for custom plans.
+                  Questions? <a href="mailto:connect@conversailabs.com" className="text-blue-400 hover:text-blue-300">Contact us</a> • Enterprise plans available
                 </p>
               </div>
             </div>
@@ -763,9 +825,10 @@ export default function HomePage() {
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-blue-500/5 rounded-2xl" />
                   <div className="relative">
-                    <h3 className="text-xl font-semibold text-white mb-4">What types of Shopify stores does it work with?</h3>
+                    <h3 className="text-xl font-semibold text-white mb-4">What e-commerce platforms does StoreCalendar support?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      StoreCalendar works with all Shopify stores - both myshopify.com domains and custom domains. 
+                      Currently, StoreCalendar works with all Shopify stores - both myshopify.com domains and custom domains. 
+                      We're expanding to WooCommerce in Month 2, followed by BigCommerce and other major platforms. 
                       Whether you sell fashion, electronics, home goods, or any other products, our AI adapts to your store&apos;s style.
                     </p>
                   </div>
@@ -774,10 +837,11 @@ export default function HomePage() {
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-2xl" />
                   <div className="relative">
-                    <h3 className="text-xl font-semibold text-white mb-4">Is there a limit to how many calendars I can generate?</h3>
+                    <h3 className="text-xl font-semibold text-white mb-4">What's included in the $29 early access pricing?</h3>
                     <p className="text-white/80 leading-relaxed">
-                      You can generate up to 10 weekly calendars per day for free. Each calendar includes 7 days of strategic posts featuring 1-10 products from your store. 
-                      Need more? Contact us for custom plans tailored to your needs.
+                      Early access subscribers get unlimited calendar generations, multiple store support, priority customer support, and early access to new platforms like WooCommerce. 
+                      The $29/month rate is locked in for life for the first 100 customers. Regular pricing will be $39/month. 
+                      Free trial includes 3 calendar generations with no credit card required.
                     </p>
                   </div>
                 </div>
@@ -814,6 +878,68 @@ export default function HomePage() {
                     </p>
                   </div>
                 </div>
+                
+                <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-blue-500/5 rounded-2xl" />
+                  <div className="relative">
+                    <h3 className="text-xl font-semibold text-white mb-4">When will other e-commerce platforms be supported?</h3>
+                    <p className="text-white/80 leading-relaxed">
+                      WooCommerce support is coming in Month 2, followed by BigCommerce and Magento. 
+                      Early access subscribers get priority access to new platforms as they launch. 
+                      Join our waitlist to be notified when your platform is ready and get 20% off the first month.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Platform Waitlist Section */}
+          <section id="waitlist" className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-slate-800 to-slate-900">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
+            <div className="relative max-w-4xl mx-auto text-center">
+              <h2 className="text-4xl font-bold mb-6 text-white">Coming to More Platforms</h2>
+              <p className="text-white/70 mb-12 text-lg">
+                We're expanding beyond Shopify. Join the waitlist for your platform and get early access.
+              </p>
+              
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="bg-white/10 backdrop-blur-2xl rounded-2xl p-6 border border-white/20">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <span className="text-white text-2xl font-bold">W</span>
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">WooCommerce</h3>
+                  <p className="text-white/70 text-sm mb-4">Coming Month 2</p>
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                    Join Waitlist
+                  </Button>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-2xl rounded-2xl p-6 border border-white/20">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <span className="text-white text-2xl font-bold">B</span>
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">BigCommerce</h3>
+                  <p className="text-white/70 text-sm mb-4">Coming Month 3</p>
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                    Join Waitlist
+                  </Button>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-2xl rounded-2xl p-6 border border-white/20">
+                  <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <span className="text-white text-2xl font-bold">+</span>
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">Other Platforms</h3>
+                  <p className="text-white/70 text-sm mb-4">Magento, Squarespace, etc.</p>
+                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                    Request Platform
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="mt-12 bg-blue-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 max-w-2xl mx-auto border border-blue-400/30">
+                <p className="text-blue-300 font-semibold">🎆 Waitlist members get 20% off when their platform launches</p>
               </div>
             </div>
           </section>
@@ -823,9 +949,9 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
             <div className="relative max-w-5xl mx-auto text-center">
-              <h2 className="text-5xl font-bold mb-6 leading-tight">Ready to Transform Your Social Media?</h2>
+              <h2 className="text-5xl font-bold mb-6 leading-tight">Ready to Automate Your E-commerce Content?</h2>
               <p className="text-white/90 mb-12 text-xl leading-relaxed max-w-3xl mx-auto">
-                Join hundreds of Shopify stores already creating better content. Start generating premium captions in seconds.
+                Join e-commerce stores already creating better content with AI. Start with Shopify today, expand to all platforms tomorrow.
               </p>
               <Button 
                 size="lg" 
@@ -846,7 +972,7 @@ export default function HomePage() {
             </div>
             <span className="font-bold text-lg text-white">StoreCalendar</span>
           </div>
-          <p className="text-white/60">&copy; 2024 StoreCalendar. Turn your Shopify products into social media gold.</p>
+          <p className="text-white/60">&copy; 2024 StoreCalendar. E-commerce content automation platform starting with Shopify.</p>
         </div>
       </footer>
     </div>

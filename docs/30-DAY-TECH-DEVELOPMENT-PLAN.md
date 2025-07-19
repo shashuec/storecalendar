@@ -1,7 +1,9 @@
-# 30-Day Technical Development Plan: StoreCalendar Visual Platform
+# 30-Day Technical Development Plan: StoreCalendar E-commerce Content Platform
 ## Auto-Posting + AI Visual Content + Revenue Attribution
 
-**Mission**: Transform V1 into visual content platform with auto-posting and revenue tracking
+**Mission**: Transform V1 into comprehensive e-commerce content platform with auto-posting and revenue tracking
+**Market Position**: Starting with Shopify, expanding to all e-commerce platforms
+**Pricing Strategy**: $29 early access, $39 regular pricing after first 100 customers
 **Tech Goal**: 4 core features built on solid V1 foundation
 **Shipping**: 5 major releases over 30 days
 **Code Estimate**: 15,000-20,000 lines of quality code
@@ -21,12 +23,31 @@
 - Complete API endpoint (`/api/generate`)
 - Comprehensive testing suite
 - TypeScript throughout, Supabase database, rate limiting
+- **Ready for Multi-Platform Expansion**: Architecture supports extending beyond Shopify
 
-### **🎯 What We're Adding (4 Core Features)**
+### **🎯 What We're Adding (5 Core Features)**
 1. **Auto-Posting Integration** (Instagram Business + LinkedIn)
 2. **AI Image Generation** (DALL-E 3 with brand consistency)
 3. **AI Video Generation** (Product slideshows with music)
 4. **Revenue Attribution** (UTM tracking + Shopify webhooks)
+5. **Multi-Platform Foundation** (WooCommerce waitlist, platform-agnostic messaging)
+
+### **📈 Market Strategy & Messaging**
+- **Positioning**: "E-commerce content platform" (not "Shopify tool")
+- **Early Access Pricing**: $29/month for first 100 customers (lifetime rate)
+- **Regular Pricing**: $39/month after early access period
+- **Platform Messaging**: "Starting with Shopify, expanding to all e-commerce platforms"
+- **Waitlist Strategy**: Collect WooCommerce/BigCommerce emails for Month 2 validation
+
+### **🗣️ Updated Messaging Framework**
+**Instead of**: "StoreCalendar for Shopify stores"
+**Say**: "StoreCalendar for e-commerce stores (starting with Shopify)"
+
+**Key Phrases**:
+- "Currently supports Shopify, WooCommerce coming soon"
+- "Built for e-commerce, not just Shopify"
+- "Join waitlist for your platform"
+- "Early access pricing: $29/month"
 
 ---
 
@@ -2069,4 +2090,10 @@ StoreCalendar V2 Architecture:
     └── Multi-store analytics
 ```
 
-**By Day 30, we'll have a complete visual content platform that auto-posts, tracks revenue, and provides intelligence - all built on our solid V1 foundation.**
+**By Day 30, we'll have a complete e-commerce content platform that:**
+- Auto-posts to social media with revenue tracking
+- Generates AI-powered images and videos
+- Provides intelligent analytics and winner detection
+- Positions for multi-platform expansion (WooCommerce Month 2)
+- Offers competitive $29 early access pricing
+- Built on our solid V1 Shopify foundation with broader market appeal
