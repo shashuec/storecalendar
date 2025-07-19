@@ -79,6 +79,20 @@ export const createTables = async () => {
       error_message TEXT,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
+
+    -- Calendar generations table (for shareable results)
+    CREATE TABLE IF NOT EXISTS calendar_generations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      store_url TEXT NOT NULL,
+      store_name TEXT,
+      calendar_data JSONB NOT NULL,
+      country VARCHAR(2),
+      brand_tone VARCHAR(20),
+      week_number INTEGER,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '30 days',
+      view_count INTEGER DEFAULT 0
+    );
   `;
   
   console.log('Run these queries in Supabase dashboard:', queries);

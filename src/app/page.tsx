@@ -9,6 +9,7 @@ import { ProductSelector } from '@/components/ProductSelector';
 import { BrandToneSelector, BrandToneSelectorCompact } from '@/components/BrandToneSelector';
 import { WeeklyCalendar } from '@/components/WeeklyCalendar';
 import { smartSelectProducts } from '@/lib/product-ranking';
+import { exportCalendarToCSV } from '@/lib/calendar-generation';
 
 export default function HomePage() {
   // Basic state
@@ -26,6 +27,10 @@ export default function HomePage() {
   
   // Copy state for calendar posts
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  
+  // Share state
+  const [shareUrl, setShareUrl] = useState<string>('');
+  const [isSharing, setIsSharing] = useState(false);
 
   // Auto-select products when enhanced products are loaded
   useEffect(() => {
@@ -144,6 +149,63 @@ export default function HomePage() {
     handleGenerate();
   };
 
+  // CSV Export Handler
+  const handleExportCSV = () => {
+    if (!result?.weekly_calendar) return;
+
+    const csvContent = exportCalendarToCSV(result.weekly_calendar);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      const storeName = result.weekly_calendar.selected_products[0]?.name?.split(' ')[0] || 'store';
+      link.setAttribute('download', `${storeName}-week-${result.weekly_calendar.week_number}-calendar.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Share Calendar Handler
+  const handleShare = async () => {
+    if (!result?.weekly_calendar) return;
+
+    setIsSharing(true);
+    try {
+      const storeName = result.weekly_calendar.selected_products[0]?.name?.split(' ')[0] || 'Store';
+      
+      const response = await fetch('/api/calendar/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          calendar: result.weekly_calendar,
+          storeName: storeName
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setShareUrl(data.shareUrl);
+        // Copy share URL to clipboard
+        await navigator.clipboard.writeText(data.shareUrl);
+        alert('Share link copied to clipboard!');
+      } else {
+        throw new Error(data.error || 'Failed to create share link');
+      }
+    } catch (error) {
+      console.error('Error creating share link:', error);
+      alert('Failed to create share link. Please try again.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
 
 
 
@@ -154,6 +216,8 @@ export default function HomePage() {
     setCurrentStep('url');
     setSelectedProducts([]);
     setCopiedCaption(null);
+    setShareUrl('');
+    setIsSharing(false);
   };
 
   return (
@@ -303,6 +367,9 @@ export default function HomePage() {
                           setCopiedCaption(post.id);
                           setTimeout(() => setCopiedCaption(null), 2000);
                         }}
+                        onExportCSV={handleExportCSV}
+                        onShare={isSharing ? undefined : handleShare}
+                        storeName={result.weekly_calendar.selected_products[0]?.name?.split(' ')[0] || 'Store'}
                       />
                       
                       {weekNumber === 1 && (

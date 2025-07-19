@@ -38,22 +38,27 @@ StoreCalendar is evolving from a Shopify-specific caption generator to a univers
 ### Key Architecture Patterns
 
 1. **Multi-Step UX Flow**: Progressive disclosure from URL input → product selection → preferences → results
-2. **Multi-Format Content Generation**: Text, images, and videos from single product input
-3. **Sales Attribution**: UTM tracking + webhook integration for revenue attribution
-4. **Rate Limiting**: Dual-layer protection (per-IP and global limits) in `src/lib/rate-limit.ts`
-5. **Comprehensive Logging**: All AI requests logged to `calendar_openai_logs` table for cost tracking
-6. **Platform-Agnostic Design**: Universal integration layer for all e-commerce platforms
+2. **Shareable Results**: Generated calendars saved with unique URLs for team collaboration (30-day expiry)
+3. **Multi-Format Content Generation**: Text, images, and videos from single product input
+4. **Sales Attribution**: UTM tracking + webhook integration for revenue attribution
+5. **Rate Limiting**: Dual-layer protection (per-IP and global limits) in `src/lib/rate-limit.ts`
+6. **Comprehensive Logging**: All AI requests logged to `calendar_openai_logs` table for cost tracking
+7. **Platform-Agnostic Design**: Universal integration layer for all e-commerce platforms
 
 ### Core Components
 
 #### **Current (V1)**
 - `src/app/api/generate/route.ts` - Main content generation endpoint
+- `src/app/api/calendar/save/route.ts` - Save calendar for sharing
+- `src/app/api/calendar/[id]/route.ts` - Retrieve shared calendars
+- `src/app/share/[id]/page.tsx` - Shared calendar viewing page
 - `src/app/page.tsx` - Multi-step UI flow with progressive disclosure
 - `src/lib/shopify.ts` - Shopify store URL validation and product scraping
 - `src/lib/openai.ts` - OpenAI integration with error handling and logging
 - `src/lib/caption-styles.ts` - Defines 7 caption styles (Product Showcase, Benefits-Focused, Social Proof, etc.)
+- `src/lib/calendar-generation.ts` - Calendar generation and CSV export functionality
 - `src/lib/supabase.ts` - Database client with TypeScript schemas
-- `src/components/WeeklyCalendar.tsx` - Calendar display with copy functionality
+- `src/components/WeeklyCalendar.tsx` - Calendar display with copy, export, and share functionality
 - `src/components/ProductSelector.tsx` - Product selection with smart ranking
 
 #### **Planned (V2)**
@@ -75,6 +80,7 @@ All tables use `calendar_` prefix:
 - `calendar_rate_limits` - IP-based rate limiting
 - `calendar_daily_stats` - Usage analytics
 - `calendar_openai_logs` - AI request tracking for cost analysis
+- `calendar_generations` - Shareable calendar storage (30-day expiry)
 
 #### **Planned Tables (V2)**
 - `calendar_visual_content` - Generated images and videos
@@ -88,6 +94,7 @@ All tables use `calendar_` prefix:
 Required environment variables (see `.env.example`):
 
 #### **Current (V1)**
+- `NEXT_PUBLIC_APP_URL` - Base URL for share links
 - `OPENAI_API_KEY` & `OPENAI_MODEL` - AI configuration
 - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Database
 - `RATE_LIMIT_PER_IP` & `RATE_LIMIT_TOTAL` - Rate limiting
@@ -138,6 +145,15 @@ Required environment variables (see `.env.example`):
 Main content generation endpoint
 - **Body**: `{ shopify_url, country, brand_tone, selected_products, week_number }`
 - **Response**: `{ success, weekly_calendar, enhanced_products, error }`
+
+#### **POST /api/calendar/save**
+Save calendar for sharing
+- **Body**: `{ calendar, storeName }`
+- **Response**: `{ success, shareId, shareUrl, error }`
+
+#### **GET /api/calendar/[id]**
+Retrieve shared calendar by ID
+- **Response**: `{ success, calendar, storeName, createdAt, viewCount, error }`
 
 ### Planned Endpoints (V2)
 

@@ -22,11 +22,12 @@
 - Comprehensive testing suite
 - TypeScript throughout, Supabase database, rate limiting
 
-### **🎯 What We're Adding (4 Core Features)**
-1. **Auto-Posting Integration** (Instagram Business + LinkedIn)
-2. **AI Image Generation** (DALL-E 3 with brand consistency)
-3. **AI Video Generation** (Product slideshows with music)
-4. **Revenue Attribution** (UTM tracking + Shopify webhooks)
+### **🎯 What We're Adding (5 Core Features)**
+1. **Shareable Results** (Unique URLs for each calendar + CSV export button)
+2. **Auto-Posting Integration** (Instagram Business + LinkedIn)
+3. **AI Image Generation** (DALL-E 3 with brand consistency)
+4. **AI Video Generation** (Product slideshows with music)
+5. **Revenue Attribution** (UTM tracking + Shopify webhooks)
 
 ---
 
@@ -34,10 +35,34 @@
 **Goal**: Add auto-posting capability to existing V1 calendar system
 **Ship**: Release 1 (Day 4) - Auto-posting launch
 
-### **DAY 1: Auto-Posting Infrastructure Setup**
-**Goal**: Choose posting service and set up social media app registrations
+### **DAY 1: Email Capture Enhancement + Auto-Posting Setup**
+**Goal**: Improve email capture system AND set up social media app registrations
 
 #### **Morning Tasks (4 hours)**
+- [ ] **Email Capture Enhancement**
+  - Move email capture earlier in the flow (not just for unlock)
+  - Add email capture to initial form with value proposition
+  - Create welcome email automation for new subscribers
+  - Track email source (which step they signed up at)
+  ```typescript
+  // Update page.tsx to capture emails earlier
+  const [email, setEmail] = useState('');
+  const [emailCaptured, setEmailCaptured] = useState(false);
+  
+  // Add to Step 1 (URL input)
+  <div className="mt-4">
+    <p className="text-sm text-white/70 mb-2">
+      Get weekly calendar updates and early access to new features
+    </p>
+    <Input
+      type="email"
+      placeholder="your@email.com"
+      value={email}
+      onChange={(e) => setEmail(e.target.value)}
+      className="bg-white/10"
+    />
+  </div>
+  ```
 - [ ] **Research Posting Services**
   - Evaluate Buffer API vs Postiz vs Direct APIs
   - Compare costs, reliability, and feature sets
@@ -50,7 +75,7 @@
   ```sql
   CREATE TABLE calendar_social_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),
+    email TEXT NOT NULL, -- Initially email-based, will add user_id on Day 10
     platform VARCHAR(50) NOT NULL,
     platform_user_id VARCHAR(255),
     access_token TEXT NOT NULL,
@@ -93,13 +118,95 @@
   - Test social media app registrations
   - Document API credentials setup process
   - Create development environment configuration
+- [ ] **Shareable Results Database**
+  ```sql
+  CREATE TABLE calendar_generations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_url TEXT NOT NULL,
+    store_name TEXT,
+    calendar_data JSONB NOT NULL,
+    country VARCHAR(2),
+    brand_tone VARCHAR(20),
+    week_number INTEGER,
+    created_at TIMESTAMP DEFAULT NOW(),
+    expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '30 days',
+    view_count INTEGER DEFAULT 0
+  );
+  
+  CREATE INDEX idx_calendar_generations_id ON calendar_generations(id);
+  CREATE INDEX idx_calendar_generations_expires ON calendar_generations(expires_at);
+  ```
 
-**Deliverable**: Social media apps registered, Buffer API integrated, OAuth foundation ready
+**Deliverable**: Social media apps registered, Buffer API integrated, OAuth foundation ready, shareable calendar database ready
 
-### **DAY 2: OAuth Implementation & Account Connections**
-**Goal**: Complete social media account connection system
+### **DAY 2: OAuth Implementation & Share Functionality**
+**Goal**: Complete social media account connections AND implement shareable calendars
 
 #### **Morning Tasks (4 hours)**
+- [ ] **Implement Calendar Sharing**
+  - Save generated calendar to database after creation
+  - Generate unique shareable URL: `/calendar/{id}`
+  - Create public calendar view page
+  - Add share button to WeeklyCalendar component
+  - Implement copy-to-clipboard for share URL
+  ```typescript
+  // /src/app/api/calendar/save/route.ts
+  export async function POST(req: Request) {
+    const { calendar_data, store_url, store_name, country, brand_tone, week_number } = await req.json();
+    
+    const { data, error } = await supabase
+      .from('calendar_generations')
+      .insert({
+        store_url,
+        store_name,
+        calendar_data,
+        country,
+        brand_tone,
+        week_number
+      })
+      .select('id')
+      .single();
+      
+    return NextResponse.json({ shareId: data.id });
+  }
+  ```
+- [ ] **Add CSV Export Button**
+  - Add export button to WeeklyCalendar UI
+  - Connect to existing exportCalendarToCSV function
+  - Download calendar as CSV file
+- [ ] **Create Public Calendar View Page**
+  ```typescript
+  // /src/app/calendar/[id]/page.tsx
+  export default async function SharedCalendarPage({ params }: { params: { id: string } }) {
+    const { data: calendar } = await supabase
+      .from('calendar_generations')
+      .select('*')
+      .eq('id', params.id)
+      .single();
+    
+    if (!calendar || new Date(calendar.expires_at) < new Date()) {
+      return <CalendarNotFound />;
+    }
+    
+    // Increment view count
+    await supabase
+      .from('calendar_generations')
+      .update({ view_count: calendar.view_count + 1 })
+      .eq('id', params.id);
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <SharedCalendarHeader storeName={calendar.store_name} />
+        <WeeklyCalendar 
+          calendar={calendar.calendar_data} 
+          isReadOnly={true}
+          showShareButton={false}
+        />
+        <ShareCTA />
+      </div>
+    );
+  }
+  ```
 - [ ] **Instagram Business OAuth**
   ```typescript
   // /src/lib/oauth/instagram.ts
@@ -1019,107 +1126,196 @@
 
 **Deliverable**: Real-time revenue notifications and analytics dashboard
 
-### **DAY 10: Revenue Dashboard Polish**
-**Goal**: Complete revenue tracking system and prepare for launch
+### **DAY 10: User Authentication & Account System**
+**Goal**: Implement user authentication to enable paid subscriptions and user-specific features
 
 #### **Morning Tasks (4 hours)**
-- [ ] **Enhanced Post Performance View**
+- [ ] **Supabase Auth Setup**
   ```typescript
-  // /src/components/PostPerformanceDetails.tsx
-  export function PostPerformanceDetails({ postId }: { postId: string }) {
-    const [performance, setPerformance] = useState<PostPerformance>();
+  // Enable Supabase Auth
+  // 1. Enable email auth in Supabase dashboard
+  // 2. Configure email templates
+  // 3. Set up redirect URLs
+  
+  // /src/lib/auth.ts
+  import { supabase } from './supabase';
+  
+  export async function signUp(email: string, password: string) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
     
-    return (
-      <div className="bg-gray-50 p-4 rounded-lg mt-4">
-        <h4 className="font-semibold mb-3">Post Performance</h4>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">Revenue</span>
-            <p className="font-bold text-green-600">
-              ${performance?.revenue || 0}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-600">Orders</span>
-            <p className="font-bold">{performance?.orderCount || 0}</p>
-          </div>
-          <div>
-            <span className="text-gray-600">Clicks</span>
-            <p className="font-bold">{performance?.clickCount || 0}</p>
-          </div>
-          <div>
-            <span className="text-gray-600">Conversion Rate</span>
-            <p className="font-bold">{performance?.conversionRate || 0}%</p>
-          </div>
-        </div>
-        
-        {performance?.revenue > 0 && (
-          <div className="mt-3 p-2 bg-green-100 rounded">
-            <p className="text-green-800 text-sm">
-              🎉 This post generated revenue! Consider creating similar content.
-            </p>
-          </div>
-        )}
-      </div>
-    );
+    // Create user profile
+    if (data.user) {
+      await supabase.from('calendar_user_profiles').insert({
+        id: data.user.id,
+        email: data.user.email
+      });
+    }
+    
+    return { data, error };
+  }
+  
+  export async function signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    return { data, error };
+  }
+  
+  export async function signOut() {
+    return await supabase.auth.signOut();
+  }
+  
+  export async function getUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
   }
   ```
-- [ ] **Revenue Export Functionality**
-  ```typescript
-  // /src/lib/export/revenue-export.ts
-  export class RevenueExportService {
-    async exportRevenueReport(userId: string, timeframe: string): Promise<Blob> {
-      const revenueData = await getDetailedRevenueData(userId, timeframe);
-      
-      const csvContent = this.formatRevenueDataAsCSV(revenueData);
-      return new Blob([csvContent], { type: 'text/csv' });
-    }
-    
-    private formatRevenueDataAsCSV(data: RevenueData[]): string {
-      const headers = ['Date', 'Post Content', 'Platform', 'Product', 'Revenue', 'Orders', 'AOV'];
-      const rows = data.map(row => [
-        row.date,
-        row.postContent,
-        row.platform,
-        row.productName,
-        row.revenue,
-        row.orderCount,
-        row.averageOrderValue
-      ]);
-      
-      return [headers, ...rows].map(row => row.join(',')).join('\n');
-    }
-  }
+- [ ] **Database Schema Updates**
+  ```sql
+  -- Add user_id to existing tables
+  ALTER TABLE calendar_social_accounts ADD COLUMN user_id UUID REFERENCES auth.users(id);
+  ALTER TABLE calendar_generations ADD COLUMN user_id UUID REFERENCES auth.users(id);
+  
+  -- Create user profile table
+  CREATE TABLE calendar_user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id),
+    email TEXT NOT NULL,
+    full_name TEXT,
+    subscription_tier TEXT DEFAULT 'free',
+    subscription_status TEXT DEFAULT 'active',
+    trial_ends_at TIMESTAMP DEFAULT NOW() + INTERVAL '7 days',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  );
+  
+  -- Create subscription plans table
+  CREATE TABLE calendar_subscription_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    price_monthly DECIMAL(10,2),
+    features JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  
+  -- Insert basic plans
+  INSERT INTO calendar_subscription_plans (name, price_monthly, features) VALUES
+  ('free', 0, '{"calendars_per_month": 3, "ai_images": false, "revenue_tracking": false}'),
+  ('premium', 47, '{"calendars_per_month": -1, "ai_images": true, "revenue_tracking": true, "video_generation": true}');
   ```
 
 #### **Afternoon Tasks (4 hours)**
-- [ ] **UTM Integration with Posting**
+- [ ] **Auth UI Components**
   ```typescript
-  // Update PostingControls to include UTM generation
-  export function PostingControls({ content, calendarPostId, productId }: Props) {
-    const handleSchedulePost = async () => {
-      // Generate UTM parameters for this post
-      const utmParams = utmGenerator.generateUTMParameters({
-        postId: calendarPostId,
-        platform: selectedPlatform,
-        productId: productId,
-        campaignType: 'organic'
+  // /src/components/auth/SignUpForm.tsx
+  export function SignUpForm() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    
+    const handleSignUp = async (e: FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      
+      // Check if email already captured
+      const existingEmail = localStorage.getItem('capturedEmail');
+      if (existingEmail === email) {
+        // User already gave us their email, seamless upgrade
+        console.log('Upgrading existing email subscriber');
+      }
+      
+      const { data, error } = await signUp(email, password);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        // Migrate any pending data
+        await migratePendingData(data.user!.id);
+        toast.success('Account created! Check your email to verify.');
+        router.push('/dashboard');
+      }
+      setLoading(false);
+    };
+    
+    return (
+      <form onSubmit={handleSignUp} className="space-y-4">
+        <Input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <Input
+          type="password"
+          placeholder="Password (min 6 characters)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={6}
+          required
+        />
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? 'Creating Account...' : 'Sign Up Free'}
+        </Button>
+      </form>
+    );
+  }
+  ```
+- [ ] **Protected Routes & Auth Context**
+  ```typescript
+  // /src/contexts/AuthContext.tsx
+  export function AuthProvider({ children }: { children: ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => {
+      // Check for existing session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
       });
       
-      // Add tracking URL to post content
-      const trackingUrl = utmGenerator.generateTrackingUrl(
-        getProductUrl(productId),
-        utmParams
-      );
+      // Listen for auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
       
-      const enhancedContent = `${content}\n\nShop now: ${trackingUrl}`;
+      return () => subscription.unsubscribe();
+    }, []);
+    
+    return (
+      <AuthContext.Provider value={{ user, loading }}>
+        {children}
+      </AuthContext.Provider>
+    );
+  }
+  ```
+- [ ] **Update Main App Flow**
+  ```typescript
+  // Update page.tsx to show auth prompts
+  export default function HomePage() {
+    const { user } = useAuth();
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    
+    // After email capture, prompt for account creation
+    const handleEmailCapture = async (email: string) => {
+      localStorage.setItem('capturedEmail', email);
       
-      // Schedule post with UTM tracking
-      await schedulePost({
-        content: enhancedContent,
-        utmParameters: utmParams,
-        calendarPostId,
+      // Show gentle signup prompt after Day 10
+      if (getDaysSinceLaunch() >= 10) {
+        setShowAuthModal(true);
+      }
+    };
+    
+    // Premium feature gates
+    const canAccessRevenue = user?.subscription_tier === 'premium';
+    const canAccessImages = user?.subscription_tier === 'premium';
+  }
         scheduledTime
       });
     };
