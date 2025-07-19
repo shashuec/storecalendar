@@ -828,7 +828,7 @@ export default function HomePage() {
                     <h3 className="text-xl font-semibold text-white mb-4">What e-commerce platforms does StoreCalendar support?</h3>
                     <p className="text-white/80 leading-relaxed">
                       Currently, StoreCalendar works with all Shopify stores - both myshopify.com domains and custom domains. 
-                      We're expanding to WooCommerce in Month 2, followed by BigCommerce and other major platforms. 
+                      We&apos;re expanding to WooCommerce in Month 2, followed by BigCommerce and other major platforms. 
                       Whether you sell fashion, electronics, home goods, or any other products, our AI adapts to your store&apos;s style.
                     </p>
                   </div>
@@ -837,7 +837,7 @@ export default function HomePage() {
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 rounded-2xl" />
                   <div className="relative">
-                    <h3 className="text-xl font-semibold text-white mb-4">What's included in the $29 early access pricing?</h3>
+                    <h3 className="text-xl font-semibold text-white mb-4">What&apos;s included in the $29 early access pricing?</h3>
                     <p className="text-white/80 leading-relaxed">
                       Early access subscribers get unlimited calendar generations, multiple store support, priority customer support, and early access to new platforms like WooCommerce. 
                       The $29/month rate is locked in for life for the first 100 customers. Regular pricing will be $39/month. 
@@ -900,7 +900,7 @@ export default function HomePage() {
             <div className="relative max-w-4xl mx-auto text-center">
               <h2 className="text-4xl font-bold mb-6 text-white">Coming to More Platforms</h2>
               <p className="text-white/70 mb-12 text-lg">
-                We're expanding beyond Shopify. Join the waitlist for your platform and get early access.
+                We&apos;re expanding beyond Shopify. Join the waitlist for your platform and get early access.
               </p>
               
               <div className="grid md:grid-cols-3 gap-6">
