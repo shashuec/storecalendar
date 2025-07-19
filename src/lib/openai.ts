@@ -4,9 +4,16 @@ import { supabase } from './supabase';
 import { getBrandTonePrompt } from './brand-tones';
 import { getUpcomingHolidays } from './holidays';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Create OpenAI client lazily to avoid module-level environment variable issues
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is missing or empty');
+  }
+  return new OpenAI({
+    apiKey,
+  });
+}
 
 const CAPTION_STYLES: Record<CaptionStyle, string> = {
   product_showcase: 'Create a compelling product showcase post that highlights the key features and benefits. Use emojis and engaging language.',
@@ -109,6 +116,7 @@ Return ONLY a JSON object with this exact format:
 Return only the JSON, no additional text or formatting.
       `;
 
+      const openai = getOpenAIClient();
       completion = await openai.chat.completions.create({
         model: process.env.OPENAI_MODEL || 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
