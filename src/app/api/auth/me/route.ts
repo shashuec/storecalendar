@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get('authorization');
-    const token = getTokenFromHeaders(authHeader);
+    const token = getTokenFromHeaders(authHeader || undefined);
     
     if (!token) {
       return NextResponse.json(

@@ -31,9 +31,6 @@ export default function ShareCalendarButton({
     setError('');
 
     try {
-      console.log('Sharing calendar with ID:', calendarId);
-      console.log('Auth headers:', getAuthHeaders());
-      
       const response = await fetch('/api/calendar/share', {
         method: 'POST',
         headers: {

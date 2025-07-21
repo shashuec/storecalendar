@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         shareToken: calendar.share_token,
         title: calendar.share_title,
         description: calendar.share_description,
-        storeName: calendar.calendar_stores?.store_name,
+        storeName: (calendar.calendar_stores as { store_name?: string })?.store_name,
         weekNumber: calendar.week_number,
         startDate: calendar.start_date,
         endDate: calendar.end_date,
@@ -115,7 +115,7 @@ export async function HEAD(request: NextRequest) {
       headers: {
         'X-Calendar-Title': calendar.share_title || 'Weekly Social Media Calendar',
         'X-Calendar-Description': calendar.share_description || 'AI-generated content calendar',
-        'X-Store-Name': calendar.calendar_stores?.store_name || 'Store',
+        'X-Store-Name': (calendar.calendar_stores as { store_name?: string })?.store_name || 'Store',
         'X-Shared-At': calendar.shared_at || new Date().toISOString(),
       }
     });

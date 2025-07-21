@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import PublicCalendar from '@/components/PublicCalendar';
+import { CalendarPost } from '@/types';
 
 interface PublicCalendarData {
   shareToken: string;
@@ -12,14 +14,21 @@ interface PublicCalendarData {
   endDate: string;
   country: string;
   brandTone: string;
-  calendarData: any;
+  calendarData: {
+    posts: CalendarPost[];
+    week_number: number;
+    start_date: string;
+    end_date: string;
+    country: string;
+    brand_tone: string;
+  };
   sharedAt: string;
 }
 
 interface PageProps {
-  params: {
+  params: Promise<{
     shareToken: string;
-  };
+  }>;
 }
 
 async function getPublicCalendar(shareToken: string): Promise<PublicCalendarData | null> {
@@ -42,7 +51,8 @@ async function getPublicCalendar(shareToken: string): Promise<PublicCalendarData
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const calendar = await getPublicCalendar(params.shareToken);
+  const { shareToken } = await params;
+  const calendar = await getPublicCalendar(shareToken);
 
   if (!calendar) {
     return {
@@ -53,7 +63,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const title = `${calendar.title} - ${calendar.storeName}`;
   const description = calendar.description;
-  const url = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/${params.shareToken}`;
+  const url = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/${shareToken}`;
 
   return {
     title,
@@ -90,7 +100,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function PublicCalendarPage({ params }: PageProps) {
-  const calendar = await getPublicCalendar(params.shareToken);
+  const { shareToken } = await params;
+  const calendar = await getPublicCalendar(shareToken);
 
   if (!calendar) {
     notFound();
@@ -113,12 +124,12 @@ export default async function PublicCalendarPage({ params }: PageProps) {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-white/70 text-sm">Shared Calendar</span>
-            <a 
+            <Link 
               href="/"
               className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
             >
               Create Your Own
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -158,7 +169,7 @@ export default async function PublicCalendarPage({ params }: PageProps) {
               Generate weekly social media content calendars for your e-commerce store with AI. 
               Get strategic, holiday-aware posts that drive engagement and sales.
             </p>
-            <a 
+            <Link 
               href="/"
               className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300"
             >
@@ -166,7 +177,7 @@ export default async function PublicCalendarPage({ params }: PageProps) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
       </main>

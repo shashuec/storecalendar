@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Helper to get auth headers
-  const getAuthHeaders = () => {
+  const getAuthHeaders = (): Record<string, string> => {
     const authToken = token || getStoredToken();
     return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
   };
@@ -93,10 +93,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       const authHeaders = getAuthHeaders();
-      if (Object.keys(authHeaders).length > 0) {
+      if (Object.keys(authHeaders).length > 0 && authHeaders.Authorization) {
         await fetch('/api/auth/logout', { 
           method: 'POST',
-          headers: authHeaders
+          headers: authHeaders as Record<string, string>
         });
       }
       clearToken();

@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       existingStore.last_scraped < sixHoursAgo;
     
     if (needsFreshData) {
-      console.log(force_refresh ? 'Force refresh requested' : 'Cache miss or expired - scraping fresh data');
+      // Force refresh or cache miss
       
       // Scrape fresh data from Shopify (fetch up to 50 products for V1)
       const scrapedData = await scrapeShopifyStore(shopify_url, 50);
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       storeData = freshStoreData;
       
     } else {
-      console.log('Cache hit - using existing data');
+      // Using cached data
       
       // Use cached store data
       storeData = existingStore;
