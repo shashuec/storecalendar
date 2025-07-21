@@ -63,9 +63,8 @@ export async function generateCaptions(
   country: CountryCode = 'US'
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
   
-  const results = [];
-  
-  for (const product of products.slice(0, 3)) { // Limit to first 3 products for initial generation
+  // PARALLEL PROCESSING: Generate captions for all products simultaneously
+  const generateSingleProductCaptions = async (product: ShopifyProduct) => {
     const startTime = Date.now();
     let success = false;
     let error: string | undefined;
@@ -147,11 +146,25 @@ Return only the JSON, no additional text or formatting.
           }
           
           if (productCaptions.length > 0) {
-            results.push({
+            success = true;
+            
+            // Log the successful request
+            if (storeId) {
+              await logOpenAIRequest(
+                storeId,
+                product.name,
+                process.env.OPENAI_MODEL || 'gpt-4o',
+                completion.usage || null,
+                responseTime,
+                success,
+                undefined
+              );
+            }
+            
+            return {
               product,
               captions: productCaptions
-            });
-            success = true;
+            };
           }
           
         } catch (parseError) {
@@ -161,16 +174,16 @@ Return only the JSON, no additional text or formatting.
         }
       }
 
-      // Log the request (single log for all styles)
+      // Log failed request
       if (storeId) {
         await logOpenAIRequest(
           storeId,
           product.name,
-          process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          process.env.OPENAI_MODEL || 'gpt-4o',
           completion.usage || null,
           responseTime,
-          success,
-          error
+          false,
+          error || 'No response content'
         );
       }
       
@@ -192,11 +205,10 @@ Return only the JSON, no additional text or formatting.
         }
         
         if (mockCaptions.length > 0) {
-          results.push({
+          return {
             product,
             captions: mockCaptions
-          });
-          success = true;
+          };
         }
       }
       
@@ -205,7 +217,7 @@ Return only the JSON, no additional text or formatting.
         await logOpenAIRequest(
           storeId,
           product.name,
-          process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          process.env.OPENAI_MODEL || 'gpt-4o',
           null,
           responseTime,
           false,
@@ -213,9 +225,21 @@ Return only the JSON, no additional text or formatting.
         );
       }
     }
-  }
+    
+    // Return null if failed
+    return null;
+  };
   
-  return results;
+  // Process ALL products in parallel - THIS IS THE KEY OPTIMIZATION
+  console.log(`🚀 Generating captions for ${products.length} products in parallel...`);
+  const promises = products.map(product => generateSingleProductCaptions(product));
+  const results = await Promise.all(promises);
+  
+  // Filter out null results (failed generations)
+  const successfulResults = results.filter(result => result !== null) as Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>;
+  
+  console.log(`✅ Successfully generated captions for ${successfulResults.length}/${products.length} products`);
+  return successfulResults;
 }
 
 export async function generateAllCaptions(
@@ -225,7 +249,7 @@ export async function generateAllCaptions(
   brandTone: BrandTone = 'casual',
   country: CountryCode = 'US'
 ): Promise<Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>> {
-  // Generate ALL 7 caption styles upfront
+  // Generate ALL 7 caption styles for ALL selected products
   const allStyles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[];
-  return generateCaptions(products.slice(0, 1), storeName, allStyles, storeId, brandTone, country); // Only first product, ALL 7 styles
+  return generateCaptions(products, storeName, allStyles, storeId, brandTone, country); // Process ALL selected products
 }

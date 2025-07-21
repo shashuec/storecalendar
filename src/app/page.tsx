@@ -212,7 +212,7 @@ export default function HomePage() {
 
   const handlePrevStep = () => {
     if (currentStep === 'auth') setCurrentStep('url');
-    else if (currentStep === 'products') setCurrentStep('url');
+    else if (currentStep === 'products') setCurrentStep('auth');
     else if (currentStep === 'preferences') setCurrentStep('products');
     else if (currentStep === 'results') setCurrentStep('preferences');
     setError('');
