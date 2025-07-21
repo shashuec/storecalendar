@@ -9,6 +9,7 @@ import { isValidBrandTone } from '@/lib/brand-tones';
 import { smartSelectProducts } from '@/lib/product-ranking';
 import { generateWeeklyCalendar } from '@/lib/calendar-generation';
 import { getUpcomingHolidays } from '@/lib/holidays';
+import { getAuthenticatedUser, createAuthError } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,15 @@ export async function POST(request: NextRequest) {
       brand_tone,
       week_number
     } = body;
+
+    // Check authentication for all requests (including product fetching)
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json(
+        createAuthError('Please sign in to continue'),
+        { status: 401 }
+      );
+    }
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -394,12 +404,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the weekly calendar in database for V1 (only if newly generated)
+    let calendarId: string | undefined;
     if (weeklyCalendar && !existingCalendar) {
       try {
         const { data: calendarData, error: calendarError } = await supabase
           .from('calendar_weekly_calendars')
           .insert({
             store_id: storeData.id,
+            user_id: user?.id,
             week_number: weekParam,
             start_date: weeklyCalendar.start_date,
             end_date: weeklyCalendar.end_date,
@@ -415,10 +427,13 @@ export async function POST(request: NextRequest) {
           console.error('Calendar storage error:', calendarError);
           // Continue anyway - don't fail the request
         } else if (calendarData) {
+          calendarId = calendarData.id;
+          
           // Store individual posts for easier querying
           const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
             calendar_id: calendarData.id,
             store_id: storeData.id,
+            user_id: user?.id,
             product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
             day_name: post.day,
             post_date: post.date,
@@ -435,6 +450,9 @@ export async function POST(request: NextRequest) {
         console.error('Calendar persistence error:', error);
         // Continue anyway - don't fail the request
       }
+    } else if (existingCalendar) {
+      // Use existing calendar ID for sharing
+      calendarId = existingCalendar.id;
     }
 
     // Get upcoming holidays for context
@@ -457,7 +475,8 @@ export async function POST(request: NextRequest) {
       // V1 additions
       enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection UI
       weekly_calendar: weeklyCalendar,
-      upcoming_holidays: upcomingHolidays
+      upcoming_holidays: upcomingHolidays,
+      calendar_id: calendarId // For sharing functionality
     };
     
     return NextResponse.json(response);
