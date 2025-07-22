@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { ButtonLoader } from '@/components/Loader';
 
 interface ShareCalendarButtonProps {
   calendarId: string;
@@ -73,31 +74,31 @@ export default function ShareCalendarButton({
     }
   };
 
-  const handleRevokeAccess = async () => {
-    if (!shareData?.shareToken) return;
+  // const handleRevokeAccess = async () => {
+  //   if (!shareData?.shareToken) return;
 
-    setIsSharing(true);
-    setError('');
+  //   setIsSharing(true);
+  //   setError('');
 
-    try {
-      const response = await fetch(`/api/calendar/share?calendarId=${calendarId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
+  //   try {
+  //     const response = await fetch(`/api/calendar/share?calendarId=${calendarId}`, {
+  //       method: 'DELETE',
+  //       headers: getAuthHeaders(),
+  //     });
 
-      const data = await response.json();
+  //     const data = await response.json();
 
-      if (data.success) {
-        setShareData(null);
-      } else {
-        setError(data.error || 'Failed to revoke access');
-      }
-    } catch (_err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsSharing(false);
-    }
-  };
+  //     if (data.success) {
+  //       setShareData(null);
+  //     } else {
+  //       setError(data.error || 'Failed to revoke access');
+  //     }
+  //   } catch (_err) {
+  //     setError('Network error. Please try again.');
+  //   } finally {
+  //     setIsSharing(false);
+  //   }
+  // };
 
   if (shareData) {
     return (
@@ -153,15 +154,15 @@ export default function ShareCalendarButton({
                 <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                Preview
+                View Page
               </Button>
-              <Button
+              {/* <Button
                 onClick={handleRevokeAccess}
                 disabled={isSharing}
                 className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs sm:text-sm py-2 px-3 sm:px-4 whitespace-nowrap"
               >
                 {isSharing ? 'Revoking...' : 'Revoke Access'}
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
@@ -178,7 +179,7 @@ export default function ShareCalendarButton({
       >
         {isSharing ? (
           <div className="flex items-center justify-center gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <ButtonLoader size="small" />
             <span className="whitespace-nowrap">Sharing...</span>
           </div>
         ) : (

@@ -12,7 +12,15 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
     
     // Fetch products.json with higher limit (max 250 per request)
     const requestLimit = Math.min(limit, 250);
-    const productsResponse = await fetch(`${shopifyUrl}/products.json?limit=${requestLimit}`);
+    const productsResponse = await fetch(`${shopifyUrl}/products.json?limit=${requestLimit}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
     
     if (!productsResponse.ok) {
       if (productsResponse.status === 404) {
@@ -98,14 +106,15 @@ export async function validateShopifyUrl(url: string): Promise<boolean> {
 // Keep synchronous version for basic format checking
 export function validateShopifyUrlFormat(url: string): boolean {
   try {
-    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Clean and normalize the URL
+    const cleanUrl = url.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
     
     // Extract just the domain part (before query parameters or paths)
     const domainPart = cleanUrl.split('?')[0].split('/')[0];
     
-    // Accept any properly formatted domain
-    // Could be .myshopify.com, custom domain, or any domain with Shopify
-    return /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(domainPart);
+    // More permissive validation - accept any valid domain format
+    // Allows: shop.myshopify.com, tentree.com, store-name.com, etc.
+    return /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.[a-zA-Z]{2,}$/.test(domainPart) || /^[a-zA-Z0-9]+\.[a-zA-Z]{2,}$/.test(domainPart);
   } catch {
     return false;
   }
