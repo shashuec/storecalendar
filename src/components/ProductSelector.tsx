@@ -109,7 +109,7 @@ export const ProductSelector = memo(function ProductSelector({
           </p>
         </div>
         
-        {/* Selection Status */}
+        {/* Selection Status
         <div className="inline-flex items-center">
           <span className={`px-4 py-2 rounded-full text-sm font-medium ${
             !isMinReached 
@@ -122,7 +122,7 @@ export const ProductSelector = memo(function ProductSelector({
              isMaxReached ? 'Maximum reached' : 
              `${maxSelection - selectedCount} remaining`}
           </span>
-        </div>
+        </div> */}
       </div>
 
       {/* Product Selector Card */}

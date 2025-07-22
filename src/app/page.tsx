@@ -13,7 +13,8 @@ import { smartSelectProducts } from '@/lib/product-ranking';
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import ShareCalendarButton from '@/components/ShareCalendarButton';
+import { PageLoader, InlineLoader } from '@/components/Loader';
+import DemoVideo from '@/components/DemoVideo';
 
 export default function HomePage() {
   // Auth state
@@ -228,11 +229,21 @@ export default function HomePage() {
 
   const handlePrevStep = useCallback(() => {
     if (currentStep === 'auth') setCurrentStep('url');
-    else if (currentStep === 'products') setCurrentStep('auth');
-    else if (currentStep === 'preferences') setCurrentStep('products');
+    else if (currentStep === 'products') {
+      // Clear selected products and results when going back from product selection
+      setSelectedProducts([]);
+      setResult(null); // Clear previous results to prevent ID conflicts with new URL
+      // If user is logged in, skip auth and go back to URL
+      setCurrentStep(user ? 'url' : 'auth');
+    }
+    else if (currentStep === 'preferences') {
+      // Clear selected products when going back to product selection
+      setSelectedProducts([]);
+      setCurrentStep('products');
+    }
     else if (currentStep === 'results') setCurrentStep('preferences');
     setError('');
-  }, [currentStep]);
+  }, [currentStep, user]);
 
   const handleGenerateWeek2 = useCallback(() => {
     setWeekNumber(2);
@@ -252,6 +263,15 @@ export default function HomePage() {
     setCopiedCaption(null);
     clearState(); // Clear persisted state
   };
+
+  // Show loading screen while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
+        <PageLoader text="Authenticating..." />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
@@ -315,7 +335,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 sm:mb-8 leading-tight">
             E-commerce Content 
-            <span className="block sm:inline bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Automation Platform</span>
+            <span className="block sm:inline bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Automation Platform</span>
           </h1>
           <p className="text-lg sm:text-xl text-white/70 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-4">
             Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
@@ -323,7 +343,7 @@ export default function HomePage() {
          
               
               {/* V1 Multi-Step Generator Form */}
-              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mb-8 sm:mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
+              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mb-8 sm:mb-16 max-w-6xl mx-auto border border-white/20 shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 to-slate-700/30 rounded-2xl sm:rounded-3xl" />
                 <div className="relative space-y-4 sm:space-y-6">
                   
@@ -471,6 +491,8 @@ export default function HomePage() {
                       <div className="bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-white/10">
                         <WeeklyCalendar
                           calendar={result.weekly_calendar}
+                          calendarId={result.calendar_id}
+                          storeName={result.store_name}
                           onCopyPost={(post) => {
                             navigator.clipboard.writeText(post.caption_text);
                             setCopiedCaption(post.id);
@@ -479,21 +501,7 @@ export default function HomePage() {
                         />
                       </div>
                       
-                      {/* Action Buttons */}
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                        {/* Share Calendar Button */}
-                        {result.weekly_calendar && result.calendar_id && (
-                          <div className="flex-1">
-                            <ShareCalendarButton 
-                              calendarId={result.calendar_id}
-                              title={`${result.store_name} - Week ${weekNumber} Calendar`}
-                              description={`AI-generated social media calendar for ${result.store_name}`}
-                              className="w-full"
-                            />
-                          </div>
-                        )}
-
-                        {/* Generate Next Week Button */}
+                      {/* Generate Next Week Button
                         {weekNumber === 1 && (
                           <div className="flex-1">
                             <Button
@@ -505,7 +513,7 @@ export default function HomePage() {
                             </Button>
                           </div>
                         )}
-                      </div>
+                      */}
 
                       {/* Success Tips */}
                       <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/20 p-4 sm:p-6">
@@ -523,7 +531,6 @@ export default function HomePage() {
                               <li>• Click any post to copy the caption instantly</li>
                               <li>• Use the CSV export for batch uploading to social media tools</li>
                               <li>• Share your calendar link with team members for collaboration</li>
-                              <li>• Generate Week 2 for extended content planning</li>
                             </ul>
                           </div>
                         </div>
@@ -574,14 +581,11 @@ export default function HomePage() {
                         className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300 text-sm sm:text-base order-1 sm:order-2"
                       >
                         {loading ? (
-                          <div className="flex items-center justify-center space-x-2">
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span className="text-xs sm:text-sm">
-                              {currentStep === 'url' ? 'Loading...' : 
-                               currentStep === 'preferences' ? 'Generating...' : 
-                               'Processing...'}
-                            </span>
-                          </div>
+                          <InlineLoader 
+                            text={currentStep === 'url' ? 'Loading products...' : 
+                                  currentStep === 'preferences' ? 'Generating calendar...' : 
+                                  'Processing...'}
+                          />
                         ) : (
                           <>
                             {currentStep === 'url' ? 'Load Products' :
@@ -597,6 +601,8 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Demo Video Section */}
+              <DemoVideo className="max-w-6xl mx-auto mb-8 sm:mb-16" />
 
               {/* Demo Preview */}
               <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
