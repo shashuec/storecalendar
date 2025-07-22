@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import { ShopifyProductEnhanced } from '@/types';
 import { filterProductsByQuery, getProductTypeSuggestions } from '@/lib/product-ranking';
 
@@ -13,7 +13,7 @@ interface ProductSelectorProps {
   maxSelection?: number;
 }
 
-export function ProductSelector({
+export const ProductSelector = memo(function ProductSelector({
   products,
   selectedProducts,
   onSelectionChange,
@@ -52,7 +52,7 @@ export function ProductSelector({
   // Get unique product types for filter dropdown
   const _productTypes = useMemo(() => getProductTypeSuggestions(products), [products]);
 
-  const handleProductToggle = (productId: string) => {
+  const handleProductToggle = useCallback((productId: string) => {
     if (disabled) return;
     
     const isSelected = selectedProducts.includes(productId);
@@ -75,7 +75,7 @@ export function ProductSelector({
     }
     
     onSelectionChange(newSelection);
-  };
+  }, [disabled, selectedProducts, minSelection, maxSelection, onSelectionChange]);
 
   const _handleSelectAll = () => {
     if (disabled) return;
@@ -83,9 +83,9 @@ export function ProductSelector({
     onSelectionChange(visibleIds);
   };
 
-  const handleShowMore = () => {
+  const handleShowMore = useCallback(() => {
     setShowLimit(prev => prev + 100);
-  };
+  }, []);
 
   const _handleClearAll = () => {
     if (disabled) return;
@@ -267,6 +267,6 @@ export function ProductSelector({
       </div>
     </div>
   );
-}
+});
 
 export default ProductSelector;

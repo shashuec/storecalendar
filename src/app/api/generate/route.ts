@@ -394,6 +394,7 @@ export async function POST(request: NextRequest) {
         .from('calendar_weekly_calendars')
         .select('*')
         .eq('store_id', storeData.id)
+        .eq('user_id', user.id) // Only fetch calendars belonging to current user
         .eq('week_number', weekParam)
         .eq('country_code', countryParam)
         .eq('brand_tone', toneParam)
@@ -401,6 +402,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       let weeklyCalendar;
+      let calendarId = null;
       
       if (existingCalendar && !force_refresh) {
         // Check if selected products match
@@ -410,6 +412,7 @@ export async function POST(request: NextRequest) {
         if (productsMatch) {
           console.log('Calendar cache hit - using existing calendar');
           weeklyCalendar = existingCalendar.calendar_data;
+          calendarId = existingCalendar.id; // Use existing calendar ID
         } else {
           console.log('Calendar cache miss - product selection changed');
           weeklyCalendar = await generateWeeklyCalendar(
@@ -436,12 +439,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Store the weekly calendar in database for V1 (only if newly generated)
-      if (weeklyCalendar && !existingCalendar) {
+      if (weeklyCalendar && !calendarId) {
         try {
           const { data: calendarData, error: calendarError } = await supabase
             .from('calendar_weekly_calendars')
             .insert({
               store_id: storeData.id,
+              user_id: user.id, // Add user_id for ownership verification
               week_number: weekParam,
               start_date: weeklyCalendar.start_date,
               end_date: weeklyCalendar.end_date,
@@ -457,6 +461,7 @@ export async function POST(request: NextRequest) {
             console.error('Calendar storage error:', calendarError);
             // Continue anyway - don't fail the request
           } else if (calendarData) {
+            calendarId = calendarData.id;
             // Store individual posts for easier querying
             const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
               calendar_id: calendarData.id,
@@ -499,7 +504,8 @@ export async function POST(request: NextRequest) {
         // V1 additions
         enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection UI
         weekly_calendar: weeklyCalendar,
-        upcoming_holidays: upcomingHolidays
+        upcoming_holidays: upcomingHolidays,
+        calendar_id: calendarId // Include calendar ID for sharing functionality
       };
       
       return NextResponse.json(response);

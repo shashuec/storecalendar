@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { GenerationResponse, CountryCode, BrandTone } from '@/types';
 
 export interface PersistedState {
@@ -18,16 +18,16 @@ const STATE_EXPIRY_HOURS = 24;
 export function usePersistedState() {
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Check if state is expired
-  const isStateExpired = (timestamp: string): boolean => {
+  // Check if state is expired - memoize to prevent recreating on every render
+  const isStateExpired = useCallback((timestamp: string): boolean => {
     const now = new Date().getTime();
     const stateTime = new Date(timestamp).getTime();
     const expiryTime = STATE_EXPIRY_HOURS * 60 * 60 * 1000; // 24 hours in ms
     return (now - stateTime) > expiryTime;
-  };
+  }, []);
 
-  // Get persisted state from localStorage
-  const getPersistedState = (): PersistedState | null => {
+  // Get persisted state from localStorage - memoize to prevent recreating
+  const getPersistedState = useCallback((): PersistedState | null => {
     if (typeof window === 'undefined') return null;
     
     try {
@@ -48,10 +48,10 @@ export function usePersistedState() {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-  };
+  }, [isStateExpired]);
 
-  // Save state to localStorage
-  const saveState = (state: Partial<PersistedState>) => {
+  // Save state to localStorage - memoize to prevent recreating
+  const saveState = useCallback((state: Partial<PersistedState>) => {
     if (typeof window === 'undefined') return;
     
     try {
@@ -73,13 +73,13 @@ export function usePersistedState() {
     } catch (error) {
       console.error('Error saving state:', error);
     }
-  };
+  }, [getPersistedState]);
 
-  // Clear persisted state
-  const clearState = () => {
+  // Clear persisted state - memoize to prevent recreating
+  const clearState = useCallback(() => {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(STORAGE_KEY);
-  };
+  }, []);
 
   // Load state on component mount
   useEffect(() => {

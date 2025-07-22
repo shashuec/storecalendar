@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,11 +36,11 @@ export default function HomePage() {
   const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
   
   // Copy state for calendar posts
-  const [_copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
   
   // Freemium usage tracking
   const [dailyUsage, setDailyUsage] = useState<number>(0);
-  const [_showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   
   // Check usage on component mount
   useEffect(() => {
@@ -49,27 +49,41 @@ export default function HomePage() {
     setDailyUsage(savedUsage ? parseInt(savedUsage) : 0);
   }, []);
 
-  // Restore state on component mount
+  // Restore state on component mount (run only once when conditions are met)
   useEffect(() => {
-    if (isLoaded && !authLoading) {
+    if (isLoaded && !authLoading && user) {
       const persistedState = getPersistedState();
-      if (persistedState && user) {
-        // Only restore state if user is authenticated
-        setCurrentStep(persistedState.currentStep);
-        setUrl(persistedState.url);
-        setSelectedProducts(persistedState.selectedProducts);
-        setSelectedCountry(persistedState.selectedCountry);
-        setSelectedTone(persistedState.selectedTone);
-        setWeekNumber(persistedState.weekNumber);
-        setResult(persistedState.result);
+      if (persistedState) {
+        // Batch all state updates to prevent multiple re-renders
+        startTransition(() => {
+          setCurrentStep(persistedState.currentStep);
+          setUrl(persistedState.url);
+          setSelectedProducts(persistedState.selectedProducts);
+          setSelectedCountry(persistedState.selectedCountry);
+          setSelectedTone(persistedState.selectedTone);
+          setWeekNumber(persistedState.weekNumber);
+          setResult(persistedState.result);
+        });
       }
     }
-  }, [isLoaded, authLoading, user, getPersistedState]);
+  }, [isLoaded, authLoading, user]); // Removed getPersistedState from dependencies
 
-  // Save state on changes
+  // Debounced state persistence to prevent excessive localStorage writes
+  const debouncedSaveState = useMemo(
+    () => {
+      let timeoutId: NodeJS.Timeout | null = null;
+      return (state: Parameters<typeof saveState>[0]) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => saveState(state), 300);
+      };
+    },
+    [saveState]
+  );
+
+  // Save state on changes with debouncing
   useEffect(() => {
     if (isLoaded && user) {
-      saveState({
+      debouncedSaveState({
         currentStep,
         url,
         selectedProducts,
@@ -79,30 +93,22 @@ export default function HomePage() {
         result,
       });
     }
-  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, saveState]);
+  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, debouncedSaveState]);
 
-  // Auto-select products when enhanced products are loaded
+  // Memoize enhanced products to prevent unnecessary recalculations
+  const enhancedProducts = useMemo(() => result?.enhanced_products || [], [result?.enhanced_products]);
+  
+  // Auto-select products when enhanced products are loaded (only once)
   useEffect(() => {
-    if (result?.enhanced_products && result.enhanced_products.length > 0 && selectedProducts.length === 0) {
-      // Auto-select top 5 products using smart selection
-      const autoSelected = smartSelectProducts(result.enhanced_products, 5);
+    if (enhancedProducts.length > 0 && selectedProducts.length === 0) {
+      const autoSelected = smartSelectProducts(enhancedProducts, 5);
       const selectedIds = autoSelected.filter(p => p.selected).map(p => p.id);
       setSelectedProducts(selectedIds);
     }
-  }, [result?.enhanced_products, selectedProducts.length]);
+  }, [enhancedProducts, selectedProducts.length]);
 
-  // Auto-proceed from auth step once user logs in
-  useEffect(() => {
-    if (currentStep === 'auth' && user && url.trim()) {
-      // User just logged in and we have a URL, now fetch products
-      handleGenerate();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, user, url]);
-
-
-
-  const handleGenerate = async (_withEmail = false, forceRefresh = false) => {
+  // Define handleGenerate before using it in effects
+  const handleGenerate = useCallback(async (withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
       setError('Please enter a Shopify store URL');
       return;
@@ -184,10 +190,18 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [url, selectedCountry, selectedTone, weekNumber, selectedProducts, getAuthHeaders, currentStep, dailyUsage]);
 
-  // Step navigation functions
-  const handleNextStep = () => {
+  // Auto-proceed from auth step once user logs in
+  useEffect(() => {
+    if (currentStep === 'auth' && user && url.trim()) {
+      // User just logged in and we have a URL, now fetch products
+      handleGenerate();
+    }
+  }, [currentStep, user, url, handleGenerate]);
+
+  // Memoized step navigation functions to prevent unnecessary re-renders
+  const handleNextStep = useCallback(() => {
     if (currentStep === 'url') {
       if (!url.trim()) {
         setError('Please enter a Shopify store URL');
@@ -210,26 +224,26 @@ export default function HomePage() {
       handleGenerate();
     }
     setError('');
-  };
+  }, [currentStep, url, user, selectedProducts.length, handleGenerate]);
 
-  const handlePrevStep = () => {
+  const handlePrevStep = useCallback(() => {
     if (currentStep === 'auth') setCurrentStep('url');
     else if (currentStep === 'products') setCurrentStep('auth');
     else if (currentStep === 'preferences') setCurrentStep('products');
     else if (currentStep === 'results') setCurrentStep('preferences');
     setError('');
-  };
+  }, [currentStep]);
 
-  const handleGenerateWeek2 = () => {
+  const handleGenerateWeek2 = useCallback(() => {
     setWeekNumber(2);
     setCurrentStep('results');
     handleGenerate();
-  };
+  }, [handleGenerate]);
 
 
 
 
-  const _resetForm = () => {
+  const resetForm = () => {
     setResult(null);
     setUrl('');
     setError('');
@@ -246,47 +260,47 @@ export default function HomePage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-900/15 via-transparent to-transparent" />
       
       {/* Header */}
-      <header className="relative px-4 lg:px-6 h-20 flex items-center border-b border-white/10 bg-black/20 backdrop-blur-xl">
+      <header className="relative px-4 lg:px-6 h-16 sm:h-20 flex items-center border-b border-white/10 bg-black/20 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">SC</span>
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-sm sm:text-lg">SC</span>
             </div>
-            <span className="font-bold text-xl text-white">StoreCalendar</span>
+            <span className="font-bold text-lg sm:text-xl text-white">StoreCalendar</span>
           </div>
-          <nav className="flex gap-6 items-center">
+          <nav className="flex gap-3 sm:gap-6 items-center">
             {!user ? (
               <>
-                <a href="#features" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                <a href="#features" className="hidden sm:block text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
                   Features
                 </a>
-                <a href="#testimonials" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                <a href="#testimonials" className="hidden md:block text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
                   Reviews
                 </a>
                 <a href="#pricing" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
                   Pricing
                 </a>
-                <a href="#faq" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                <a href="#faq" className="hidden sm:block text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
                   FAQ
                 </a>
               </>
             ) : (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <div className="flex items-center gap-2">
                   {user.picture && (
                     <Image 
                       src={user.picture} 
                       alt={user.name}
-                      width={32}
-                      height={32}
-                      className="rounded-full"
+                      width={28}
+                      height={28}
+                      className="rounded-full sm:w-8 sm:h-8"
                     />
                   )}
-                  <span className="text-white/90 text-sm">{user.name}</span>
+                  <span className="hidden sm:block text-white/90 text-sm">{user.name}</span>
                 </div>
                 <Button
                   onClick={logout}
-                  className="bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-1 rounded-lg border border-white/20 transition-all duration-300"
+                  className="bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-lg border border-white/20 transition-all duration-300"
                 >
                   Logout
                 </Button>
@@ -297,33 +311,33 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative px-4 lg:px-6 py-32">
+      <section className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32">
         <div className="max-w-6xl mx-auto text-center">
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-8 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 sm:mb-8 leading-tight">
             E-commerce Content 
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Automation Platform</span>
+            <span className="block sm:inline bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Automation Platform</span>
           </h1>
-          <p className="text-xl text-white/70 mb-12 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl text-white/70 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-4">
             Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
           </p>
          
               
               {/* V1 Multi-Step Generator Form */}
-              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 to-slate-700/30 rounded-3xl" />
-                <div className="relative space-y-6">
+              <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mb-8 sm:mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 to-slate-700/30 rounded-2xl sm:rounded-3xl" />
+                <div className="relative space-y-4 sm:space-y-6">
                   
                   {/* Step Indicator */}
-                  <div className="flex items-center justify-center space-x-4 mb-8">
+                  <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 overflow-x-auto">
                     {[
                       { key: 'url', label: 'Store URL' },
                       { key: 'products', label: 'Products' },
                       { key: 'preferences', label: 'Preferences' },
                       { key: 'results', label: 'Calendar' }
                     ].map((stepInfo, index) => (
-                      <div key={stepInfo.key} className="flex items-center">
+                      <div key={stepInfo.key} className="flex items-center flex-shrink-0">
                         <div className="flex flex-col items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                          <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
                             currentStep === stepInfo.key 
                               ? 'bg-blue-500 text-white' 
                               : index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
@@ -332,10 +346,10 @@ export default function HomePage() {
                           }`}>
                             {index + 1}
                           </div>
-                          <div className="text-xs text-white/70 mt-1 text-center">{stepInfo.label}</div>
+                          <div className="text-xs text-white/70 mt-1 text-center whitespace-nowrap">{stepInfo.label}</div>
                         </div>
                         {index < 3 && (
-                          <div className={`w-8 h-0.5 mx-2 ${
+                          <div className={`w-4 sm:w-8 h-0.5 mx-1 sm:mx-2 ${
                             index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
                               ? 'bg-green-500'
                               : 'bg-white/20'
@@ -347,7 +361,7 @@ export default function HomePage() {
 
                   {/* Step 1: URL Input */}
                   {currentStep === 'url' && (
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                       <div>
                         <label htmlFor="url" className="block text-sm font-medium text-white/90 mb-3">
                           Enter Your E-commerce Store URL
@@ -358,12 +372,12 @@ export default function HomePage() {
                           placeholder="e.g., mystore.myshopify.com or myshop.com"
                           value={url}
                           onChange={(e) => setUrl(e.target.value)}
-                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-14 px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300"
+                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
                           disabled={loading}
                         />
                         <div className="mt-2 text-center">
-                          <p className="text-white/60 text-sm">Currently supports Shopify • <span className="text-blue-400">WooCommerce coming soon</span></p>
-                          <a href="#waitlist" className="text-blue-400 hover:text-blue-300 text-sm underline">Join waitlist for your platform →</a>
+                          <p className="text-white/60 text-xs sm:text-sm">Currently supports Shopify • <span className="text-blue-400">WooCommerce coming soon</span></p>
+                          <a href="#waitlist" className="text-blue-400 hover:text-blue-300 text-xs sm:text-sm underline">Join waitlist for your platform →</a>
                         </div>
                       </div>
                     </div>
@@ -371,12 +385,12 @@ export default function HomePage() {
 
                   {/* Step 2: Authentication */}
                   {currentStep === 'auth' && (
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                       <div className="text-center">
-                        <h3 className="text-2xl font-bold text-white mb-2">
+                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
                           Sign in to continue
                         </h3>
-                        <p className="text-white/70 mb-8">
+                        <p className="text-white/70 mb-6 sm:mb-8 text-sm sm:text-base">
                           Create your weekly content calendar with AI
                         </p>
                         
@@ -384,14 +398,14 @@ export default function HomePage() {
                           <GoogleLoginButton />
                         </div>
                         
-                        <p className="text-sm text-white/50 mt-8">
+                        <p className="text-xs sm:text-sm text-white/50 mt-6 sm:mt-8 px-4">
                           By signing in, you agree to our Terms of Service and Privacy Policy
                         </p>
                         
-                        <div className="mt-6">
+                        <div className="mt-4 sm:mt-6">
                           <Button
                             onClick={handlePrevStep}
-                            className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-xl border border-white/20 transition-all duration-300"
+                            className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base"
                           >
                             ← Back to URL
                           </Button>
@@ -416,13 +430,13 @@ export default function HomePage() {
 
                   {/* Step 4: Preferences (Country + Brand Tone) */}
                   {currentStep === 'preferences' && (
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                       <div className="text-center mb-4">
-                        <h3 className="text-lg font-medium text-white mb-2">Set Your Preferences</h3>
-                        <p className="text-sm text-white/70">Choose your country for holiday-aware content and select your brand voice</p>                        
+                        <h3 className="text-base sm:text-lg font-medium text-white mb-2">Set Your Preferences</h3>
+                        <p className="text-xs sm:text-sm text-white/70 px-4">Choose your country for holiday-aware content and select your brand voice</p>                        
                       </div>
                       
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         <CountrySelectorCompact
                           selectedCountry={selectedCountry}
                           onCountryChange={setSelectedCountry}
@@ -439,70 +453,132 @@ export default function HomePage() {
 
                   {/* Step 5: Results */}
                   {currentStep === 'results' && result?.weekly_calendar && (
-                    <div className="space-y-6">
-                      <WeeklyCalendar
-                        calendar={result.weekly_calendar}
-                        onCopyPost={(post) => {
-                          navigator.clipboard.writeText(post.caption_text);
-                          setCopiedCaption(post.id);
-                          setTimeout(() => setCopiedCaption(null), 2000);
-                        }}
-                      />
-                      
-                      {/* Share Calendar Button */}
-                      {result.calendar_id && (
-                        <ShareCalendarButton 
-                          calendarId={result.calendar_id}
-                          title={`${result.store_name} - Week ${weekNumber} Calendar`}
-                          description={`AI-generated social media calendar for ${result.store_name}`}
-                        />
-                      )}
-
-                      {weekNumber === 1 && (
-                        <div className="text-center">
-                          <Button
-                            onClick={handleGenerateWeek2}
-                            disabled={loading}
-                            className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300"
-                          >
-                            {loading ? 'Generating...' : 'Generate Next Week →'}
-                          </Button>
+                    <div className="space-y-4 sm:space-y-6">
+                      {/* Results Header */}
+                      <div className="text-center space-y-2 sm:space-y-3">
+                        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-green-500 rounded-full mb-3 sm:mb-4">
+                          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                      )}
+                        <h3 className="text-xl sm:text-2xl font-bold text-white">Your Calendar is Ready! 🎉</h3>
+                        <p className="text-sm sm:text-base text-white/70 px-4">
+                          {result.store_name} - Week {weekNumber} • {result.weekly_calendar.posts.length} strategic posts
+                        </p>
+                      </div>
+
+                      {/* Calendar Component */}
+                      <div className="bg-white/5 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 lg:p-6 border border-white/10">
+                        <WeeklyCalendar
+                          calendar={result.weekly_calendar}
+                          onCopyPost={(post) => {
+                            navigator.clipboard.writeText(post.caption_text);
+                            setCopiedCaption(post.id);
+                            setTimeout(() => setCopiedCaption(null), 2000);
+                          }}
+                        />
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                        {/* Share Calendar Button */}
+                        {result.weekly_calendar && result.calendar_id && (
+                          <div className="flex-1">
+                            <ShareCalendarButton 
+                              calendarId={result.calendar_id}
+                              title={`${result.store_name} - Week ${weekNumber} Calendar`}
+                              description={`AI-generated social media calendar for ${result.store_name}`}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+
+                        {/* Generate Next Week Button */}
+                        {weekNumber === 1 && (
+                          <div className="flex-1">
+                            <Button
+                              onClick={handleGenerateWeek2}
+                              disabled={loading}
+                              className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300 text-sm sm:text-base"
+                            >
+                              {loading ? 'Generating...' : 'Generate Next Week →'}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Success Tips */}
+                      <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/20 p-4 sm:p-6">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-blue-300 font-semibold text-sm sm:text-base mb-2">💡 Pro Tips</h4>
+                            <ul className="space-y-1 text-white/80 text-xs sm:text-sm">
+                              <li>• Click any post to copy the caption instantly</li>
+                              <li>• Use the CSV export for batch uploading to social media tools</li>
+                              <li>• Share your calendar link with team members for collaboration</li>
+                              <li>• Generate Week 2 for extended content planning</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Start Over Button */}
+                      <div className="text-center pt-4 border-t border-white/10">
+                        <Button
+                          onClick={() => {
+                            setCurrentStep('url');
+                            setResult(null);
+                            setUrl('');
+                            setSelectedProducts([]);
+                            setWeekNumber(1);
+                            setError('');
+                          }}
+                          className="bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm"
+                        >
+                          ← Create New Calendar
+                        </Button>
+                      </div>
                     </div>
                   )}
 
                   {/* Error Display */}
                   {error && (
-                    <div className="text-red-300 text-sm bg-red-500/20 backdrop-blur-sm p-4 rounded-xl border border-red-500/30">
+                    <div className="text-red-300 text-xs sm:text-sm bg-red-500/20 backdrop-blur-sm p-3 sm:p-4 rounded-xl border border-red-500/30 mx-2 sm:mx-0">
                       {error}
                     </div>
                   )}
 
                   {/* Navigation Buttons */}
                   {currentStep !== 'results' && currentStep !== 'auth' && (
-                    <div className="flex items-center justify-between pt-6">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 pt-4 sm:pt-6">
                       {currentStep !== 'url' ? (
                         <Button
                           onClick={handlePrevStep}
                           disabled={loading}
-                          className="bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-6 rounded-xl border border-white/20 transition-all duration-300"
+                          className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base order-2 sm:order-1"
                         >
                           ← Back
                         </Button>
-                      ) : <div />}
+                      ) : <div className="hidden sm:block" />}
                       
                       <Button
                         onClick={handleNextStep}
                         disabled={loading}
-                        className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300"
+                        className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300 text-sm sm:text-base order-1 sm:order-2"
                       >
                         {loading ? (
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center justify-center space-x-2">
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>
-                              {currentStep === 'url' ? 'Loading Products...' : 
-                               currentStep === 'preferences' ? 'Generating Calendar...' : 
+                            <span className="text-xs sm:text-sm">
+                              {currentStep === 'url' ? 'Loading...' : 
+                               currentStep === 'preferences' ? 'Generating...' : 
                                'Processing...'}
                             </span>
                           </div>
@@ -523,11 +599,11 @@ export default function HomePage() {
 
 
               {/* Demo Preview */}
-              <div className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-3xl" />
+              <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl sm:rounded-3xl" />
                 <div className="relative text-left">
-                  <div className="text-sm text-white/60 mb-6 text-center">📅 Example week for: E-commerce Store (Organic Cotton T-Shirts)</div>
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="text-xs sm:text-sm text-white/60 mb-4 sm:mb-6 text-center px-2">📅 Example week for: E-commerce Store (Organic Cotton T-Shirts)</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-3">
                       <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-indigo-400">
                         <div className="flex items-center gap-2 mb-2">
@@ -578,36 +654,36 @@ export default function HomePage() {
           </section>
 
           {/* Stats Section */}
-          <section className="relative px-4 lg:px-6 py-20 bg-gradient-to-r from-slate-800 to-slate-900">
+          <section className="relative px-4 lg:px-6 py-12 sm:py-16 lg:py-20 bg-gradient-to-r from-slate-800 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/10 via-transparent to-transparent" />
             <div className="relative max-w-6xl mx-auto">
-              <div className="grid md:grid-cols-4 gap-8 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 text-center">
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">AI</div>
-                  <div className="text-white/70 text-sm">Powered</div>
+                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 group-hover:text-blue-400 transition-colors duration-300">AI</div>
+                  <div className="text-white/70 text-xs sm:text-sm">Powered</div>
                 </div>
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">10K+</div>
-                  <div className="text-white/70 text-sm">Calendars Generated</div>
+                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 group-hover:text-blue-400 transition-colors duration-300">10K+</div>
+                  <div className="text-white/70 text-xs sm:text-sm">Calendars Generated</div>
                 </div>
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">30 sec</div>
-                  <div className="text-white/70 text-sm">Average Generation Time</div>
+                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 group-hover:text-blue-400 transition-colors duration-300">30 sec</div>
+                  <div className="text-white/70 text-xs sm:text-sm">Average Time</div>
                 </div>
                 <div className="group">
-                  <div className="text-4xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300">4.9/5</div>
-                  <div className="text-white/70 text-sm">User Rating</div>
+                  <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 group-hover:text-blue-400 transition-colors duration-300">4.9/5</div>
+                  <div className="text-white/70 text-xs sm:text-sm">User Rating</div>
                 </div>
               </div>
             </div>
           </section>
 
           {/* Testimonials Section */}
-          <section id="testimonials" className="relative px-4 lg:px-6 py-32 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+          <section id="testimonials" className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-900/15 via-transparent to-transparent" />
             <div className="relative max-w-6xl mx-auto">
-              <h2 className="text-4xl font-bold text-center mb-16 text-white">What Our Users Say</h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-center mb-8 sm:mb-12 lg:mb-16 text-white">What Our Users Say</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl p-8 border border-white/20">
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 rounded-2xl" />
                   <div className="relative">
@@ -661,17 +737,17 @@ export default function HomePage() {
           </section>
 
           {/* Features Section */}
-          <section id="features" className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-slate-900 to-slate-800">
+          <section id="features" className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32 bg-gradient-to-r from-slate-900 to-slate-800">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
             <div className="relative max-w-6xl mx-auto">
-              <h2 className="text-4xl font-bold text-center mb-16 text-white">Why StoreCalendar?</h2>
-              <div className="grid md:grid-cols-3 gap-8">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-center mb-8 sm:mb-12 lg:mb-16 text-white">Why StoreCalendar?</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 <div className="text-center group">
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
-                    <span className="text-white text-2xl">⚡</span>
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
+                    <span className="text-white text-xl sm:text-2xl">⚡</span>
                   </div>
-                  <h3 className="font-bold text-xl mb-4 text-white">Instant Results</h3>
-                  <p className="text-white/70 leading-relaxed">Get 7 different captions in 30 seconds. No waiting, no delays. AI-powered speed meets human creativity.</p>
+                  <h3 className="font-bold text-lg sm:text-xl mb-3 sm:mb-4 text-white">Instant Results</h3>
+                  <p className="text-white/70 leading-relaxed text-sm sm:text-base">Get 7 different captions in 30 seconds. No waiting, no delays. AI-powered speed meets human creativity.</p>
                 </div>
                 <div className="text-center group">
                   <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">
@@ -692,16 +768,16 @@ export default function HomePage() {
           </section>
 
           {/* How It Works */}
-          <section id="how-it-works" className="relative px-4 lg:px-6 py-32 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
+          <section id="how-it-works" className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
             <div className="relative max-w-5xl mx-auto">
-              <h2 className="text-4xl font-bold text-center mb-16 text-white">How It Works</h2>
-              <div className="space-y-12">
-                <div className="flex items-center gap-8 group">
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">1</div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-center mb-8 sm:mb-12 lg:mb-16 text-white">How It Works</h2>
+              <div className="space-y-8 sm:space-y-12">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 group">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-lg sm:text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 flex-shrink-0">1</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">Enter Store & Select Country</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Enter your Shopify URL and choose your country (US/UK/India) for holiday-aware content generation</p>
+                    <h3 className="font-bold text-lg sm:text-xl lg:text-2xl mb-2 text-white">Enter Store & Select Country</h3>
+                    <p className="text-white/70 text-sm sm:text-base lg:text-lg leading-relaxed">Enter your Shopify URL and choose your country (US/UK/India) for holiday-aware content generation</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-8 group">
@@ -837,20 +913,20 @@ export default function HomePage() {
           </section>
 
           {/* Pricing/Value Section */}
-          <section id="pricing" className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-slate-800 to-slate-900">
+          <section id="pricing" className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32 bg-gradient-to-r from-slate-800 to-slate-900">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/15 via-transparent to-transparent" />
             <div className="relative max-w-4xl mx-auto text-center">
-              <h2 className="text-4xl font-bold mb-6 text-white">Simple Pricing</h2>
-              <p className="text-white/70 mb-12 text-lg">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6 text-white">Simple Pricing</h2>
+              <p className="text-white/70 mb-8 sm:mb-12 text-base sm:text-lg px-4">
                 Start free today. Upgrade to unlimited calendars when ready.
               </p>
               
-              <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
                 {/* Free Tier */}
-                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border-2 border-green-400">
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-3xl" />
+                <div className="bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border-2 border-green-400 relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-2xl sm:rounded-3xl" />
                   <div className="relative">
-                    <div className="text-5xl font-bold text-white mb-2">FREE</div>
+                    <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">FREE</div>
                     <div className="text-green-300 mb-6 font-semibold">Perfect for getting started</div>
                     <ul className="space-y-3 text-left text-white/80">
                       <li className="flex items-center gap-3">
@@ -891,13 +967,13 @@ export default function HomePage() {
                 </div>
 
                 {/* Premium Coming Soon */}
-                <div className="bg-white/10 backdrop-blur-2xl rounded-3xl p-8 border border-white/20 opacity-75 relative">
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-bold">
+                <div className="bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-white/20 opacity-75 relative">
+                  <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold">
                     COMING SOON
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-3xl" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-2xl sm:rounded-3xl" />
                   <div className="relative">
-                    <div className="text-5xl font-bold text-white mb-2">$29<span className="text-2xl">/month</span></div>
+                    <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">$29<span className="text-lg sm:text-xl lg:text-2xl">/month</span></div>
                     <div className="text-purple-300 mb-2 font-semibold">Premium (Early Access Rate)</div>
                     <div className="text-white/70 mb-6 text-sm">Regular price will be $39/month</div>
                     <ul className="space-y-3 text-left text-white/80">
@@ -1090,23 +1166,23 @@ export default function HomePage() {
           </section>
 
           {/* CTA Section */}
-          <section className="relative px-4 lg:px-6 py-32 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 text-white overflow-hidden">
+          <section className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 text-white overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
             <div className="relative max-w-5xl mx-auto text-center">
-              <h2 className="text-5xl font-bold mb-6 leading-tight">Ready to Automate Your E-commerce Content?</h2>
-              <p className="text-white/90 mb-12 text-xl leading-relaxed max-w-3xl mx-auto">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 leading-tight px-4">Ready to Automate Your E-commerce Content?</h2>
+              <p className="text-white/90 mb-8 sm:mb-12 text-base sm:text-lg lg:text-xl leading-relaxed max-w-3xl mx-auto px-4">
                 Join e-commerce stores already creating better content with AI. Start with Shopify today, expand to all platforms tomorrow.
               </p>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <Button 
                   size="lg" 
-                  className="bg-white text-blue-600 hover:bg-white/90 px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                  className="bg-white text-blue-600 hover:bg-white/90 px-8 sm:px-12 py-3 sm:py-6 text-lg sm:text-xl font-semibold rounded-xl sm:rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                   onClick={() => document.getElementById('generator-form')?.scrollIntoView({ behavior: 'smooth' })}
                 >
                   Start Free Today ✨
                 </Button>
-                <p className="text-white/80 text-lg">
+                <p className="text-white/80 text-sm sm:text-base lg:text-lg px-4">
                   3 free calendars daily • No credit card • Premium coming soon
                 </p>
               </div>
@@ -1114,15 +1190,15 @@ export default function HomePage() {
           </section>
 
       {/* Footer */}
-      <footer className="px-4 lg:px-6 py-12 bg-slate-900 border-t border-white/10">
+      <footer className="px-4 lg:px-6 py-8 sm:py-12 bg-slate-900 border-t border-white/10">
         <div className="max-w-6xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-sm">SC</span>
+          <div className="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-xs sm:text-sm">SC</span>
             </div>
-            <span className="font-bold text-lg text-white">StoreCalendar</span>
+            <span className="font-bold text-base sm:text-lg text-white">StoreCalendar</span>
           </div>
-          <p className="text-white/60">&copy; 2024 StoreCalendar. E-commerce content automation platform starting with Shopify.</p>
+          <p className="text-white/60 text-xs sm:text-sm px-4">&copy; 2024 StoreCalendar. E-commerce content automation platform starting with Shopify.</p>
         </div>
       </footer>
     </div>
