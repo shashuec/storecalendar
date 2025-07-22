@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 import Image from 'next/image';
 import { WeeklyCalendar as WeeklyCalendarType, CalendarPost } from '@/types';
 import { exportCalendarToCSV } from '@/lib/calendar-generation';
@@ -38,7 +38,7 @@ function formatDate(dateString: string): string {
   });
 }
 
-function PostCard({ 
+const PostCard = memo(function PostCard({ 
   post, 
   onCopy, 
   onEdit 
@@ -49,7 +49,7 @@ function PostCard({
 }) {
   const [isCopied, setIsCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (onCopy) {
       onCopy(post);
     } else {
@@ -58,7 +58,7 @@ function PostCard({
     
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-  };
+  }, [onCopy, post]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
@@ -180,9 +180,9 @@ function PostCard({
 
     </div>
   );
-}
+});
 
-export function WeeklyCalendar({ 
+export const WeeklyCalendar = memo(function WeeklyCalendar({ 
   calendar, 
   onCopyPost, 
   onEditPost, 
@@ -190,7 +190,7 @@ export function WeeklyCalendar({
 }: WeeklyCalendarProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = useCallback(() => {
     const csvContent = exportCalendarToCSV(calendar);
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -201,13 +201,20 @@ export function WeeklyCalendar({
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-  };
+  }, [calendar]);
 
-  // Group posts by day
-  const postsByDay = calendar.posts.reduce((acc, post) => {
-    acc[post.day] = post;
-    return acc;
-  }, {} as Record<string, CalendarPost>);
+  // Group posts by day - memoized to prevent recalculation on every render
+  const postsByDay = useMemo(() => {
+    return calendar.posts.reduce((acc, post) => {
+      acc[post.day] = post;
+      return acc;
+    }, {} as Record<string, CalendarPost>);
+  }, [calendar.posts]);
+
+  // Memoize day selection handler
+  const handleDaySelection = useCallback((day: string) => {
+    setSelectedDay(current => current === day ? null : day);
+  }, []);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -248,7 +255,7 @@ export function WeeklyCalendar({
             return (
               <button
                 key={day}
-                onClick={() => setSelectedDay(isSelected ? null : day)}
+                onClick={() => handleDaySelection(day)}
                 className={`
                   p-3 rounded-lg border-2 text-left transition-all
                   ${isSelected 
@@ -352,7 +359,7 @@ export function WeeklyCalendar({
 
       {/* Calendar Actions */}
       <div className="bg-gray-50 rounded-lg p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="text-sm text-gray-600">
             <p>✨ Your {calendar.week_number === 1 ? 'weekly' : `week ${calendar.week_number}`} calendar is ready!</p>
             <p className="text-xs text-gray-500 mt-1">
@@ -360,19 +367,19 @@ export function WeeklyCalendar({
             </p>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <button 
               onClick={handleExportCSV}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+              className="px-3 sm:px-4 py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 whitespace-nowrap"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <span>Export CSV</span>
             </button>
             
             {calendar.week_number === 1 && (
-              <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+              <button className="px-3 sm:px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap">
                 Generate Week 2
               </button>
             )}
@@ -381,6 +388,6 @@ export function WeeklyCalendar({
       </div>
     </div>
   );
-}
+});
 
 export default WeeklyCalendar;
