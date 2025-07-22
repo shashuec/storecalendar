@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { CalendarPost } from '@/types';
 
 interface PublicCalendarProps {
@@ -70,11 +71,12 @@ export default function PublicCalendar({ calendar }: PublicCalendarProps) {
 
             {/* Product Image */}
             {post.product_featured?.image_url && (
-              <div className="mb-4 rounded-xl overflow-hidden">
-                <img
+              <div className="mb-4 rounded-xl overflow-hidden relative h-48">
+                <Image
                   src={post.product_featured.image_url}
                   alt={post.product_featured.name}
-                  className="w-full h-48 object-cover"
+                  fill
+                  className="object-cover"
                 />
               </div>
             )}

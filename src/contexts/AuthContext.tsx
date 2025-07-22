@@ -130,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check auth with stored token
       checkAuth();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

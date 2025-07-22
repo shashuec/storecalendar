@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { ShopifyProduct, CaptionStyle, BrandTone, CountryCode, Holiday } from '@/types';
+import { ShopifyProduct, CaptionStyle, BrandTone, CountryCode } from '@/types';
 import { supabase } from './supabase';
 import { getBrandTonePrompt } from './brand-tones';
 import { getUpcomingHolidays } from './holidays';

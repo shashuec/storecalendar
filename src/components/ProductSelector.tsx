@@ -22,7 +22,7 @@ export function ProductSelector({
   maxSelection = 10
 }: ProductSelectorProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
+  const [filterType, _setFilterType] = useState<string>('all');
   const [showLimit, setShowLimit] = useState(100); // Initially show 100 products
 
   // Filter products based on search and type
@@ -50,7 +50,7 @@ export function ProductSelector({
   const hasMore = filteredProducts.length > showLimit;
 
   // Get unique product types for filter dropdown
-  const productTypes = useMemo(() => getProductTypeSuggestions(products), [products]);
+  const _productTypes = useMemo(() => getProductTypeSuggestions(products), [products]);
 
   const handleProductToggle = (productId: string) => {
     if (disabled) return;
@@ -77,7 +77,7 @@ export function ProductSelector({
     onSelectionChange(newSelection);
   };
 
-  const handleSelectAll = () => {
+  const _handleSelectAll = () => {
     if (disabled) return;
     const visibleIds = productsToDisplay.slice(0, maxSelection).map(p => p.id);
     onSelectionChange(visibleIds);
@@ -87,7 +87,7 @@ export function ProductSelector({
     setShowLimit(prev => prev + 100);
   };
 
-  const handleClearAll = () => {
+  const _handleClearAll = () => {
     if (disabled) return;
     onSelectionChange([]);
   };

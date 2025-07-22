@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabase';
 import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced, CalendarPost } from '@/types';
 import { isValidCountryCode } from '@/lib/country-detection';
 import { isValidBrandTone } from '@/lib/brand-tones';
-import { smartSelectProducts } from '@/lib/product-ranking';
 import { generateWeeklyCalendar } from '@/lib/calendar-generation';
 import { getUpcomingHolidays } from '@/lib/holidays';
 import { getAuthenticatedUser, createAuthError } from '@/lib/auth-middleware';
@@ -488,7 +487,7 @@ export async function POST(request: NextRequest) {
         store_name: storeName,
         products: finalProducts, // Return the final selected products
         all_captions: captionResults.flatMap(result => 
-          result.captions.map(caption => ({
+          result.captions.map((caption: { text: string; style: string }) => ({
             id: '', // Will be filled from DB if needed
             product_id: result.product.id,
             caption_text: caption.text,

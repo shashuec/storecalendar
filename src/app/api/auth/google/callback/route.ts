@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Save or update user in database
     
     // Check if user exists
-    const { data: existingUser, error: fetchError } = await supabase
+    const { data: existingUser, error: _fetchError } = await supabase
       .from('calendar_users')
       .select('*')
       .eq('google_id', googleUser.id)

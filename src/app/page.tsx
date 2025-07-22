@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced } from '@/types';
-import { CountrySelector, CountrySelectorCompact } from '@/components/CountrySelector';
+import { GenerationResponse, CountryCode, BrandTone } from '@/types';
+import { CountrySelectorCompact } from '@/components/CountrySelector';
 import { ProductSelector } from '@/components/ProductSelector';
-import { BrandToneSelector, BrandToneSelectorCompact } from '@/components/BrandToneSelector';
+import { BrandToneSelectorCompact } from '@/components/BrandToneSelector';
 import { WeeklyCalendar } from '@/components/WeeklyCalendar';
 import { smartSelectProducts } from '@/lib/product-ranking';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,11 +36,11 @@ export default function HomePage() {
   const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
   
   // Copy state for calendar posts
-  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [_copiedCaption, setCopiedCaption] = useState<string | null>(null);
   
   // Freemium usage tracking
   const [dailyUsage, setDailyUsage] = useState<number>(0);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [_showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   
   // Check usage on component mount
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function HomePage() {
         setResult(persistedState.result);
       }
     }
-  }, [isLoaded, authLoading, user]);
+  }, [isLoaded, authLoading, user, getPersistedState]);
 
   // Save state on changes
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function HomePage() {
         result,
       });
     }
-  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result]);
+  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, saveState]);
 
   // Auto-select products when enhanced products are loaded
   useEffect(() => {
@@ -96,11 +97,12 @@ export default function HomePage() {
       // User just logged in and we have a URL, now fetch products
       handleGenerate();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, user, url]);
 
 
 
-  const handleGenerate = async (withEmail = false, forceRefresh = false) => {
+  const handleGenerate = async (_withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
       setError('Please enter a Shopify store URL');
       return;
@@ -227,7 +229,7 @@ export default function HomePage() {
 
 
 
-  const resetForm = () => {
+  const _resetForm = () => {
     setResult(null);
     setUrl('');
     setError('');
@@ -272,10 +274,12 @@ export default function HomePage() {
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   {user.picture && (
-                    <img 
+                    <Image 
                       src={user.picture} 
                       alt={user.name}
-                      className="w-8 h-8 rounded-full"
+                      width={32}
+                      height={32}
+                      className="rounded-full"
                     />
                   )}
                   <span className="text-white/90 text-sm">{user.name}</span>

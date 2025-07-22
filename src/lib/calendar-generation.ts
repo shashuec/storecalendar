@@ -6,7 +6,7 @@ const DAYS_OF_WEEK = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ];
 
-const POST_TYPES = [
+const _POST_TYPES = [
   'Product Showcase',
   'Testimonial', 
   'How-to',
@@ -104,8 +104,8 @@ export async function generateWeeklyCalendar(
   const endDate = dates[6];
   
   // Get holidays for the week
-  const weekStart = new Date(startDate);
-  const weekEnd = new Date(endDate);
+  const _weekStart = new Date(startDate);
+  const _weekEnd = new Date(endDate);
   const weekHolidays = await getUpcomingHolidays(country, 7);
   
   // Create holiday map by date

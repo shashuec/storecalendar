@@ -54,7 +54,7 @@ export default function ShareCalendarButton({
       } else {
         setError(data.error || 'Failed to share calendar');
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Network error. Please try again.');
     } finally {
       setIsSharing(false);
@@ -92,7 +92,7 @@ export default function ShareCalendarButton({
       } else {
         setError(data.error || 'Failed to revoke access');
       }
-    } catch (err) {
+    } catch (_err) {
       setError('Network error. Please try again.');
     } finally {
       setIsSharing(false);
