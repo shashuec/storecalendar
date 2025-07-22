@@ -29,7 +29,7 @@ export default function HomePage() {
   const [result, setResult] = useState<GenerationResponse | null>(null);
   const [error, setError] = useState('');
   
-  // V1 form state
+  // V1 form state - initialize based on auth state
   const [currentStep, setCurrentStep] = useState<'url' | 'auth' | 'products' | 'preferences' | 'results'>('url');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>('US');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
@@ -50,24 +50,43 @@ export default function HomePage() {
     setDailyUsage(savedUsage ? parseInt(savedUsage) : 0);
   }, []);
 
-  // Restore state on component mount (run only once when conditions are met)
+  // Initialize proper step based on auth state and persisted data
   useEffect(() => {
-    if (isLoaded && !authLoading && user) {
-      const persistedState = getPersistedState();
-      if (persistedState) {
-        // Batch all state updates to prevent multiple re-renders
-        startTransition(() => {
-          setCurrentStep(persistedState.currentStep);
-          setUrl(persistedState.url);
-          setSelectedProducts(persistedState.selectedProducts);
-          setSelectedCountry(persistedState.selectedCountry);
-          setSelectedTone(persistedState.selectedTone);
-          setWeekNumber(persistedState.weekNumber);
-          setResult(persistedState.result);
-        });
+    if (isLoaded && !authLoading) {
+      if (user) {
+        // User is authenticated, restore their state
+        const persistedState = getPersistedState();
+        if (persistedState) {
+          // Batch all state updates to prevent multiple re-renders
+          startTransition(() => {
+            setCurrentStep(persistedState.currentStep);
+            setUrl(persistedState.url);
+            setSelectedProducts(persistedState.selectedProducts);
+            setSelectedCountry(persistedState.selectedCountry);
+            setSelectedTone(persistedState.selectedTone);
+            setWeekNumber(persistedState.weekNumber);
+            setResult(persistedState.result);
+          });
+        } else {
+          // Authenticated user but no saved state, start at URL step
+          setCurrentStep('url');
+        }
+      } else {
+        // User not authenticated, check if they have entered a URL before
+        const persistedState = getPersistedState();
+        if (persistedState && persistedState.url) {
+          // User has a URL saved but not authenticated, go to auth step
+          startTransition(() => {
+            setUrl(persistedState.url);
+            setCurrentStep('auth');
+          });
+        } else {
+          // Fresh user, start at URL step
+          setCurrentStep('url');
+        }
       }
     }
-  }, [isLoaded, authLoading, user]); // Removed getPersistedState from dependencies
+  }, [isLoaded, authLoading, user]); // Removed getPersistedState to prevent dependency issues
 
   // Debounced state persistence to prevent excessive localStorage writes
   const debouncedSaveState = useMemo(
@@ -83,7 +102,7 @@ export default function HomePage() {
 
   // Save state on changes with debouncing
   useEffect(() => {
-    if (isLoaded && user) {
+    if (isLoaded) {
       debouncedSaveState({
         currentStep,
         url,
@@ -94,7 +113,7 @@ export default function HomePage() {
         result,
       });
     }
-  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, debouncedSaveState]);
+  }, [isLoaded, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, debouncedSaveState]);
 
   // Memoize enhanced products to prevent unnecessary recalculations
   const enhancedProducts = useMemo(() => result?.enhanced_products || [], [result?.enhanced_products]);
@@ -167,6 +186,9 @@ export default function HomePage() {
         // V1 flow: proceed to next step or show results
         if (currentStep === 'url' && data.enhanced_products) {
           setCurrentStep('products');
+        } else if (currentStep === 'auth' && data.enhanced_products) {
+          // User logged in and products loaded, skip URL step and go to products
+          setCurrentStep('products');
         } else if (currentStep === 'products') {
           setCurrentStep('preferences');
         } else if (currentStep === 'preferences') {
@@ -195,11 +217,17 @@ export default function HomePage() {
 
   // Auto-proceed from auth step once user logs in
   useEffect(() => {
-    if (currentStep === 'auth' && user && url.trim()) {
-      // User just logged in and we have a URL, now fetch products
-      handleGenerate();
+    if (currentStep === 'auth' && user && url.trim() && !loading) {
+      // User just logged in and we have a URL, and we're not already loading
+      if (result?.enhanced_products) {
+        // Products already loaded, skip directly to product selection
+        setCurrentStep('products');
+      } else {
+        // Need to load products first, then will auto-navigate to products step
+        handleGenerate();
+      }
     }
-  }, [currentStep, user, url, handleGenerate]);
+  }, [currentStep, user, url, result?.enhanced_products, loading, handleGenerate]);
 
   // Memoized step navigation functions to prevent unnecessary re-renders
   const handleNextStep = useCallback(() => {
@@ -348,7 +376,7 @@ export default function HomePage() {
                 <div className="relative space-y-4 sm:space-y-6">
                   
                   {/* Step Indicator */}
-                  <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 overflow-x-auto">
+                  <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 overflow-hidden">
                     {[
                       { key: 'url', label: 'Store URL' },
                       { key: 'products', label: 'Products' },
@@ -357,7 +385,7 @@ export default function HomePage() {
                     ].map((stepInfo, index) => (
                       <div key={stepInfo.key} className="flex items-center flex-shrink-0">
                         <div className="flex flex-col items-center">
-                          <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
+                          <div className={`w-5 h-5 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
                             currentStep === stepInfo.key 
                               ? 'bg-blue-500 text-white' 
                               : index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
@@ -366,7 +394,7 @@ export default function HomePage() {
                           }`}>
                             {index + 1}
                           </div>
-                          <div className="text-xs text-white/70 mt-1 text-center whitespace-nowrap">{stepInfo.label}</div>
+                          <div className="text-[8px] sm:text-xs text-white/70 mt-1 text-center whitespace-nowrap">{stepInfo.label}</div>
                         </div>
                         {index < 3 && (
                           <div className={`w-4 sm:w-8 h-0.5 mx-1 sm:mx-2 ${
@@ -395,10 +423,7 @@ export default function HomePage() {
                           className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
                           disabled={loading}
                         />
-                        <div className="mt-2 text-center">
-                          <p className="text-white/60 text-xs sm:text-sm">Currently supports Shopify • <span className="text-blue-400">WooCommerce coming soon</span></p>
-                          <a href="#waitlist" className="text-blue-400 hover:text-blue-300 text-xs sm:text-sm underline">Join waitlist for your platform →</a>
-                        </div>
+                       
                       </div>
                     </div>
                   )}
@@ -410,7 +435,7 @@ export default function HomePage() {
                         <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
                           Sign in to continue
                         </h3>
-                        <p className="text-white/70 mb-6 sm:mb-8 text-sm sm:text-base">
+                        <p className="text-white/70 mb-2 text-sm sm:text-base">
                           Create your weekly content calendar with AI
                         </p>
                         
@@ -779,25 +804,25 @@ export default function HomePage() {
             <div className="relative max-w-5xl mx-auto">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-center mb-8 sm:mb-12 lg:mb-16 text-white">How It Works</h2>
               <div className="space-y-8 sm:space-y-12">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 group">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-lg sm:text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 flex-shrink-0">1</div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 lg:gap-8 group">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg lg:text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 flex-shrink-0">1</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg sm:text-xl lg:text-2xl mb-2 text-white">Enter Store & Select Country</h3>
+                    <h3 className="font-bold text-base sm:text-lg lg:text-xl xl:text-2xl mb-1 sm:mb-2 text-white">Enter Store & Select Country</h3>
                     <p className="text-white/70 text-sm sm:text-base lg:text-lg leading-relaxed">Enter your Shopify URL and choose your country (US/UK/India) for holiday-aware content generation</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-8 group">
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">2</div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 lg:gap-8 group">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg lg:text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 flex-shrink-0">2</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">Choose Products & Brand Tone</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Select 1-10 products to feature and pick your brand tone (Professional, Casual, Playful, or Luxury)</p>
+                    <h3 className="font-bold text-base sm:text-lg lg:text-xl xl:text-2xl mb-1 sm:mb-2 text-white">Choose Products & Brand Tone</h3>
+                    <p className="text-white/70 text-sm sm:text-base lg:text-lg leading-relaxed">Select 1-10 products to feature and pick your brand tone (Professional, Casual, Playful, or Luxury)</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-8 group">
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110">3</div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 lg:gap-8 group">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-base sm:text-lg lg:text-xl shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 flex-shrink-0">3</div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-2xl mb-2 text-white">Get Your 7-Day Calendar</h3>
-                    <p className="text-white/70 text-lg leading-relaxed">Receive a complete week of holiday-aware posts with strategic content rotation and export as CSV</p>
+                    <h3 className="font-bold text-base sm:text-lg lg:text-xl xl:text-2xl mb-1 sm:mb-2 text-white">Get Your 7-Day Calendar</h3>
+                    <p className="text-white/70 text-sm sm:text-base lg:text-lg leading-relaxed">Receive a complete week of holiday-aware posts with strategic content rotation and export as CSV</p>
                   </div>
                 </div>
               </div>
