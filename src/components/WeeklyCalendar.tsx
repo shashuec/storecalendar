@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { WeeklyCalendar as WeeklyCalendarType, CalendarPost, Holiday } from '@/types';
+import { WeeklyCalendar as WeeklyCalendarType, CalendarPost } from '@/types';
 import { exportCalendarToCSV } from '@/lib/calendar-generation';
 
 interface WeeklyCalendarProps {

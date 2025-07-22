@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
 import { generateAllCaptions } from '@/lib/openai';
-import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
+// TEMPORARILY DISABLED - Rate limiting imports
+// import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
 import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced, CalendarPost } from '@/types';
 import { isValidCountryCode } from '@/lib/country-detection';
 import { isValidBrandTone } from '@/lib/brand-tones';
-import { smartSelectProducts } from '@/lib/product-ranking';
 import { generateWeeklyCalendar } from '@/lib/calendar-generation';
 import { getUpcomingHolidays } from '@/lib/holidays';
+import { getAuthenticatedUser, createAuthError } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,15 @@ export async function POST(request: NextRequest) {
       brand_tone,
       week_number
     } = body;
+
+    // Check authentication for all requests (including product fetching)
+    const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return NextResponse.json(
+        createAuthError('Please sign in to continue'),
+        { status: 401 }
+      );
+    }
     
     // Validate input
     if (!shopify_url || typeof shopify_url !== 'string') {
@@ -71,7 +81,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check rate limits
+    // TEMPORARILY DISABLED - Rate limits
+    // To re-enable: uncomment the code below
+    /*
     const clientIP = getClientIP(request);
     const [ipRateLimit, globalRateLimit] = await Promise.all([
       checkRateLimit(clientIP),
@@ -99,6 +111,7 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
+    */
     
     // Check if we have cached data (within 6 hours)
     const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -120,7 +133,7 @@ export async function POST(request: NextRequest) {
       existingStore.last_scraped < sixHoursAgo;
     
     if (needsFreshData) {
-      console.log(force_refresh ? 'Force refresh requested' : 'Cache miss or expired - scraping fresh data');
+      // Force refresh or cache miss
       
       // Scrape fresh data from Shopify (fetch up to 50 products for V1)
       const scrapedData = await scrapeShopifyStore(shopify_url, 50);
@@ -158,7 +171,7 @@ export async function POST(request: NextRequest) {
       storeData = freshStoreData;
       
     } else {
-      console.log('Cache hit - using existing data');
+      // Using cached data
       
       // Use cached store data
       storeData = existingStore;
@@ -261,206 +274,263 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Apply product selection and ranking for V1
-    let finalProducts: ShopifyProductEnhanced[] = products as ShopifyProductEnhanced[];
-    if (selected_products && selected_products.length > 0) {
-      // Filter to selected products only
-      finalProducts = (products as ShopifyProductEnhanced[]).filter(p => selected_products.includes(p.id));
-    } else {
-      // Use smart auto-selection (top 5 products) - only if we have enhanced products
-      if (products.length > 0 && products[0].hasOwnProperty('rank')) {
-        finalProducts = smartSelectProducts(products as ShopifyProductEnhanced[], Math.min(5, products.length)).filter(p => p.selected);
-      } else {
-        // For basic products, just take available products (up to 5)
-        finalProducts = (products as ShopifyProductEnhanced[]).slice(0, Math.min(5, products.length));
-      }
-    }
+    // NEW FLOW: Determine what step we're at based on parameters
+    const isProductScraping = !selected_products || selected_products.length === 0;
+    const isCalendarGeneration = selected_products && selected_products.length > 0 && (country || brand_tone || week_number);
 
-    // Generate ALL 7 captions upfront (no email needed initially)
-    let captionResults;
-    
-    if (!email) {
-      // No email - generate all captions but mark as preview
-      const countryParam: CountryCode = country || 'US';
-      const toneParam: BrandTone = brand_tone || 'casual';
+    if (isProductScraping) {
+      // STEP 1: Just scrape and return products - NO AI GENERATION
+      console.log('Step 1: Product scraping only - no AI calls');
       
-      captionResults = await generateAllCaptions(
-        finalProducts, 
-        storeName, 
-        storeData.id, 
-        toneParam, 
-        countryParam
-      );
-      
-      // Check if caption generation failed
-      if (!captionResults || captionResults.length === 0 || captionResults[0]?.captions?.length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to generate captions. Please try again or contact support if the issue persists.' },
-          { status: 500 }
-        );
-      }
-    } else {
-      // Email provided - just return success (captions already generated)
-      // Store email
-      await supabase
-        .from('calendar_emails')
-        .upsert({
-          email,
-          store_id: storeData.id
-        }, {
-          onConflict: 'email,store_id'
-        });
-      
-      // Return success with email stored flag
       return NextResponse.json({
         success: true,
-        email_stored: true,
-        message: 'Email stored successfully'
+        store_name: storeName,
+        enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection
+        step: 'products',
+        message: 'Products loaded successfully'
       });
-    }
-    
-    // Store generated captions
-    if (productData && captionResults.length > 0) {
-      const captionsToInsert = [];
       
-      for (const result of captionResults) {
-        const dbProduct = productData.find(p => p.shopify_product_id === result.product.id);
-        if (dbProduct) {
-          for (const caption of result.captions) {
-            captionsToInsert.push({
-              product_id: dbProduct.id,
-              caption_text: caption.text,
-              caption_style: caption.style
+    } else if (isCalendarGeneration) {
+      // STEP 3: Generate captions and calendar for SELECTED products only
+      console.log('Step 3: Generating captions and calendar for selected products');
+      
+      // Apply product selection - filter to selected products only
+      const finalProducts: ShopifyProductEnhanced[] = (products as ShopifyProductEnhanced[])
+        .filter(p => selected_products.includes(p.id));
+      
+      if (finalProducts.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'No valid products found for selected IDs' },
+          { status: 400 }
+        );
+      }
+
+      // Generate captions for SELECTED products only
+      let captionResults;
+      
+      // Check if we have cached captions first
+      const { data: cachedCaptions } = await supabase
+        .from('calendar_captions')
+        .select('*')
+        .in('product_id', productData?.map(p => p.id) || [])
+        .gte('created_at', sixHoursAgo);
+      
+      if (cachedCaptions && cachedCaptions.length > 0 && !force_refresh) {
+        // Transform cached captions to match expected format
+        console.log('Using cached captions - no AI call needed');
+        const captionsByProduct = new Map();
+        
+        cachedCaptions.forEach(caption => {
+          const dbProduct = productData?.find(p => p.id === caption.product_id);
+          const product = finalProducts.find(p => p.id === dbProduct?.shopify_product_id);
+          
+          if (product) {
+            if (!captionsByProduct.has(product.id)) {
+              captionsByProduct.set(product.id, { product, captions: [] });
+            }
+            captionsByProduct.get(product.id).captions.push({
+              style: caption.caption_style,
+              text: caption.caption_text
             });
           }
+        });
+        
+        captionResults = Array.from(captionsByProduct.values());
+      } else {
+        // No cached captions - generate new ones for selected products
+        console.log('Generating captions for selected products');
+        const countryParam: CountryCode = country || 'US';
+        const toneParam: BrandTone = brand_tone || 'casual';
+        
+        captionResults = await generateAllCaptions(
+          finalProducts, 
+          storeName, 
+          storeData.id, 
+          toneParam, 
+          countryParam
+        );
+        
+        // Check if caption generation failed
+        if (!captionResults || captionResults.length === 0) {
+          return NextResponse.json(
+            { success: false, error: 'Failed to generate captions. Please try again or contact support if the issue persists.' },
+            { status: 500 }
+          );
         }
       }
       
-      if (captionsToInsert.length > 0) {
-        await supabase
-          .from('calendar_captions')
-          .insert(captionsToInsert);
+      // Store generated captions
+      if (productData && captionResults.length > 0) {
+        const captionsToInsert = [];
+        
+        for (const result of captionResults) {
+          const dbProduct = productData.find(p => p.shopify_product_id === result.product.id);
+          if (dbProduct) {
+            for (const caption of result.captions) {
+              captionsToInsert.push({
+                product_id: dbProduct.id,
+                caption_text: caption.text,
+                caption_style: caption.style
+              });
+            }
+          }
+        }
+        
+        if (captionsToInsert.length > 0) {
+          await supabase
+            .from('calendar_captions')
+            .insert(captionsToInsert);
+        }
       }
-    }
 
-    // Generate weekly calendar for V1
-    const countryParam: CountryCode = country || 'US';
-    const toneParam: BrandTone = brand_tone || 'casual';
-    const weekParam: 1 | 2 = week_number || 1;
+      // Generate weekly calendar for selected products
+      const countryParam: CountryCode = country || 'US';
+      const toneParam: BrandTone = brand_tone || 'casual';
+      const weekParam: 1 | 2 = week_number || 1;
 
-    // Check if we have a cached calendar with the same parameters
-    const selectedProductIds = finalProducts.map(p => p.id).sort();
-    const { data: existingCalendar } = await supabase
-      .from('calendar_weekly_calendars')
-      .select('*')
-      .eq('store_id', storeData.id)
-      .eq('week_number', weekParam)
-      .eq('country_code', countryParam)
-      .eq('brand_tone', toneParam)
-      .gte('created_at', sixHoursAgo)
-      .single();
+      // Check if we have a cached calendar with the same parameters
+      const selectedProductIds = finalProducts.map(p => p.id).sort();
+      const { data: existingCalendar } = await supabase
+        .from('calendar_weekly_calendars')
+        .select('*')
+        .eq('store_id', storeData.id)
+        .eq('week_number', weekParam)
+        .eq('country_code', countryParam)
+        .eq('brand_tone', toneParam)
+        .gte('created_at', sixHoursAgo)
+        .single();
 
-    let weeklyCalendar;
-    
-    if (existingCalendar && !force_refresh) {
-      // Check if selected products match
-      const cachedProductIds = (existingCalendar.selected_products as string[]).sort();
-      const productsMatch = JSON.stringify(selectedProductIds) === JSON.stringify(cachedProductIds);
+      let weeklyCalendar;
       
-      if (productsMatch) {
-        console.log('Calendar cache hit - using existing calendar');
-        weeklyCalendar = existingCalendar.calendar_data;
+      if (existingCalendar && !force_refresh) {
+        // Check if selected products match
+        const cachedProductIds = (existingCalendar.selected_products as string[]).sort();
+        const productsMatch = JSON.stringify(selectedProductIds) === JSON.stringify(cachedProductIds);
+        
+        if (productsMatch) {
+          console.log('Calendar cache hit - using existing calendar');
+          weeklyCalendar = existingCalendar.calendar_data;
+        } else {
+          console.log('Calendar cache miss - product selection changed');
+          weeklyCalendar = await generateWeeklyCalendar(
+            finalProducts,
+            storeName,
+            countryParam,
+            toneParam,
+            weekParam,
+            storeData.id,
+            captionResults // Pass existing captions to avoid duplicate AI calls
+          );
+        }
       } else {
-        console.log('Calendar cache miss - product selection changed');
+        console.log('Calendar cache miss - generating new calendar');
         weeklyCalendar = await generateWeeklyCalendar(
           finalProducts,
           storeName,
           countryParam,
           toneParam,
           weekParam,
-          storeData.id
+          storeData.id,
+          captionResults // Pass existing captions to avoid duplicate AI calls
         );
       }
-    } else {
-      console.log('Calendar cache miss - generating new calendar');
-      weeklyCalendar = await generateWeeklyCalendar(
-        finalProducts,
-        storeName,
-        countryParam,
-        toneParam,
-        weekParam,
-        storeData.id
-      );
-    }
 
-    // Store the weekly calendar in database for V1 (only if newly generated)
-    if (weeklyCalendar && !existingCalendar) {
-      try {
-        const { data: calendarData, error: calendarError } = await supabase
-          .from('calendar_weekly_calendars')
-          .insert({
-            store_id: storeData.id,
-            week_number: weekParam,
-            start_date: weeklyCalendar.start_date,
-            end_date: weeklyCalendar.end_date,
-            country_code: countryParam,
-            brand_tone: toneParam,
-            selected_products: finalProducts.map(p => p.id),
-            calendar_data: weeklyCalendar
-          })
-          .select()
-          .single();
+      // Store the weekly calendar in database for V1 (only if newly generated)
+      if (weeklyCalendar && !existingCalendar) {
+        try {
+          const { data: calendarData, error: calendarError } = await supabase
+            .from('calendar_weekly_calendars')
+            .insert({
+              store_id: storeData.id,
+              week_number: weekParam,
+              start_date: weeklyCalendar.start_date,
+              end_date: weeklyCalendar.end_date,
+              country_code: countryParam,
+              brand_tone: toneParam,
+              selected_products: finalProducts.map(p => p.id),
+              calendar_data: weeklyCalendar
+            })
+            .select()
+            .single();
 
-        if (calendarError) {
-          console.error('Calendar storage error:', calendarError);
+          if (calendarError) {
+            console.error('Calendar storage error:', calendarError);
+            // Continue anyway - don't fail the request
+          } else if (calendarData) {
+            // Store individual posts for easier querying
+            const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
+              calendar_id: calendarData.id,
+              store_id: storeData.id,
+              product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
+              day_name: post.day,
+              post_date: post.date,
+              post_type: post.post_type,
+              caption_text: post.caption_text,
+              holiday_context: post.holiday_context || null
+            }));
+
+            await supabase
+              .from('calendar_posts')
+              .insert(postsToInsert);
+          }
+        } catch (error) {
+          console.error('Calendar persistence error:', error);
           // Continue anyway - don't fail the request
-        } else if (calendarData) {
-          // Store individual posts for easier querying
-          const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
-            calendar_id: calendarData.id,
-            store_id: storeData.id,
-            product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
-            day_name: post.day,
-            post_date: post.date,
-            post_type: post.post_type,
-            caption_text: post.caption_text,
-            holiday_context: post.holiday_context || null
-          }));
-
-          await supabase
-            .from('calendar_posts')
-            .insert(postsToInsert);
         }
-      } catch (error) {
-        console.error('Calendar persistence error:', error);
-        // Continue anyway - don't fail the request
       }
-    }
 
-    // Get upcoming holidays for context
-    const upcomingHolidays = getUpcomingHolidays(countryParam, 14);
-    
-    const response: GenerationResponse = {
-      success: true,
-      store_name: storeName,
-      products: finalProducts, // Return the final selected products
-      all_captions: captionResults.flatMap(result => 
-        result.captions.map(caption => ({
-          id: '', // Will be filled from DB if needed
-          product_id: result.product.id,
-          caption_text: caption.text,
-          caption_style: caption.style,
-          created_at: new Date().toISOString()
-        }))
-      ),
-      requires_email: true, // Always true initially, UI will handle preview vs full
-      // V1 additions
-      enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection UI
-      weekly_calendar: weeklyCalendar,
-      upcoming_holidays: upcomingHolidays
-    };
-    
-    return NextResponse.json(response);
+      // Get upcoming holidays for context
+      const upcomingHolidays = getUpcomingHolidays(countryParam, 14);
+      
+      const response: GenerationResponse = {
+        success: true,
+        store_name: storeName,
+        products: finalProducts, // Return the final selected products
+        all_captions: captionResults.flatMap(result => 
+          result.captions.map((caption: { text: string; style: string }) => ({
+            id: '', // Will be filled from DB if needed
+            product_id: result.product.id,
+            caption_text: caption.text,
+            caption_style: caption.style,
+            created_at: new Date().toISOString()
+          }))
+        ),
+        requires_email: true, // Always true initially, UI will handle preview vs full
+        // V1 additions
+        enhanced_products: products as ShopifyProductEnhanced[], // Return all products for selection UI
+        weekly_calendar: weeklyCalendar,
+        upcoming_holidays: upcomingHolidays
+      };
+      
+      return NextResponse.json(response);
+      
+    } else {
+      // Handle other cases (like email storage)
+      if (email) {
+        await supabase
+          .from('calendar_emails')
+          .upsert({
+            email,
+            store_id: storeData.id
+          }, {
+            onConflict: 'email,store_id'
+          });
+        
+        return NextResponse.json({
+          success: true,
+          email_stored: true,
+          message: 'Email stored successfully'
+        });
+      }
+      
+      // If we reach here, return products for selection
+      return NextResponse.json({
+        success: true,
+        store_name: storeName,
+        enhanced_products: products as ShopifyProductEnhanced[],
+        step: 'products'
+      });
+    }
     
   } catch (error) {
     console.error('Generation error:', error);

@@ -6,7 +6,7 @@ const DAYS_OF_WEEK = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ];
 
-const POST_TYPES = [
+const _POST_TYPES = [
   'Product Showcase',
   'Testimonial', 
   'How-to',
@@ -94,7 +94,8 @@ export async function generateWeeklyCalendar(
   country: CountryCode,
   brandTone: BrandTone,
   weekNumber: 1 | 2 = 1,
-  storeId?: string
+  storeId?: string,
+  existingCaptions?: Array<{ product: ShopifyProduct; captions: Array<{ style: CaptionStyle; text: string }> }>
 ): Promise<WeeklyCalendar> {
   
   // Get next 7 days
@@ -103,8 +104,8 @@ export async function generateWeeklyCalendar(
   const endDate = dates[6];
   
   // Get holidays for the week
-  const weekStart = new Date(startDate);
-  const weekEnd = new Date(endDate);
+  const _weekStart = new Date(startDate);
+  const _weekEnd = new Date(endDate);
   const weekHolidays = await getUpcomingHolidays(country, 7);
   
   // Create holiday map by date
@@ -113,20 +114,27 @@ export async function generateWeeklyCalendar(
     holidayMap.set(holiday.date, holiday);
   });
   
-  // Generate captions for all products
-  const allStyles: CaptionStyle[] = [
-    'product_showcase', 'benefits_focused', 'how_to_style', 
-    'behind_scenes', 'social_proof', 'problem_solution', 'call_to_action'
-  ];
-  
-  const captionResults = await generateCaptions(
-    products, 
-    storeName, 
-    allStyles, 
-    storeId, 
-    brandTone, 
-    country
-  );
+  // Use existing captions if provided, otherwise generate new ones
+  let captionResults;
+  if (existingCaptions && existingCaptions.length > 0) {
+    // Reuse existing captions - NO AI CALL
+    captionResults = existingCaptions;
+  } else {
+    // Fallback: generate captions if not provided (backward compatibility)
+    const allStyles: CaptionStyle[] = [
+      'product_showcase', 'benefits_focused', 'how_to_style', 
+      'behind_scenes', 'social_proof', 'problem_solution', 'call_to_action'
+    ];
+    
+    captionResults = await generateCaptions(
+      products, 
+      storeName, 
+      allStyles, 
+      storeId, 
+      brandTone, 
+      country
+    );
+  }
   
   // Create caption map by product and style
   const captionMap = new Map();

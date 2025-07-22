@@ -1,16 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced } from '@/types';
-import { CountrySelector, CountrySelectorCompact } from '@/components/CountrySelector';
+import { GenerationResponse, CountryCode, BrandTone } from '@/types';
+import { CountrySelectorCompact } from '@/components/CountrySelector';
 import { ProductSelector } from '@/components/ProductSelector';
-import { BrandToneSelector, BrandToneSelectorCompact } from '@/components/BrandToneSelector';
+import { BrandToneSelectorCompact } from '@/components/BrandToneSelector';
 import { WeeklyCalendar } from '@/components/WeeklyCalendar';
 import { smartSelectProducts } from '@/lib/product-ranking';
+import { useAuth } from '@/contexts/AuthContext';
+import GoogleLoginButton from '@/components/GoogleLoginButton';
+import { usePersistedState } from '@/hooks/usePersistedState';
+import ShareCalendarButton from '@/components/ShareCalendarButton';
 
 export default function HomePage() {
+  // Auth state
+  const { user, loading: authLoading, logout, getAuthHeaders } = useAuth();
+  
+  // State persistence
+  const { isLoaded, getPersistedState, saveState, clearState } = usePersistedState();
+  
   // Basic state
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,18 +29,18 @@ export default function HomePage() {
   const [error, setError] = useState('');
   
   // V1 form state
-  const [currentStep, setCurrentStep] = useState<'url' | 'products' | 'preferences' | 'results'>('url');
+  const [currentStep, setCurrentStep] = useState<'url' | 'auth' | 'products' | 'preferences' | 'results'>('url');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>('US');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedTone, setSelectedTone] = useState<BrandTone>('casual');
   const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
   
   // Copy state for calendar posts
-  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [_copiedCaption, setCopiedCaption] = useState<string | null>(null);
   
   // Freemium usage tracking
   const [dailyUsage, setDailyUsage] = useState<number>(0);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [_showUpgradePrompt, setShowUpgradePrompt] = useState(false);
   
   // Check usage on component mount
   useEffect(() => {
@@ -37,6 +48,38 @@ export default function HomePage() {
     const savedUsage = localStorage.getItem(`usage_${today}`);
     setDailyUsage(savedUsage ? parseInt(savedUsage) : 0);
   }, []);
+
+  // Restore state on component mount
+  useEffect(() => {
+    if (isLoaded && !authLoading) {
+      const persistedState = getPersistedState();
+      if (persistedState && user) {
+        // Only restore state if user is authenticated
+        setCurrentStep(persistedState.currentStep);
+        setUrl(persistedState.url);
+        setSelectedProducts(persistedState.selectedProducts);
+        setSelectedCountry(persistedState.selectedCountry);
+        setSelectedTone(persistedState.selectedTone);
+        setWeekNumber(persistedState.weekNumber);
+        setResult(persistedState.result);
+      }
+    }
+  }, [isLoaded, authLoading, user, getPersistedState]);
+
+  // Save state on changes
+  useEffect(() => {
+    if (isLoaded && user) {
+      saveState({
+        currentStep,
+        url,
+        selectedProducts,
+        selectedCountry,
+        selectedTone,
+        weekNumber,
+        result,
+      });
+    }
+  }, [isLoaded, user, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, saveState]);
 
   // Auto-select products when enhanced products are loaded
   useEffect(() => {
@@ -48,9 +91,18 @@ export default function HomePage() {
     }
   }, [result?.enhanced_products, selectedProducts.length]);
 
+  // Auto-proceed from auth step once user logs in
+  useEffect(() => {
+    if (currentStep === 'auth' && user && url.trim()) {
+      // User just logged in and we have a URL, now fetch products
+      handleGenerate();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, user, url]);
 
 
-  const handleGenerate = async (withEmail = false, forceRefresh = false) => {
+
+  const handleGenerate = async (_withEmail = false, forceRefresh = false) => {
     if (!url.trim()) {
       setError('Please enter a Shopify store URL');
       return;
@@ -79,6 +131,7 @@ export default function HomePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
         body: JSON.stringify(requestBody),
       });
@@ -140,6 +193,11 @@ export default function HomePage() {
         setError('Please enter a Shopify store URL');
         return;
       }
+      // Check if user is authenticated before proceeding
+      if (!user) {
+        setCurrentStep('auth');
+        return;
+      }
       handleGenerate();
     } else if (currentStep === 'products') {
       if (selectedProducts.length < 1) {
@@ -155,7 +213,8 @@ export default function HomePage() {
   };
 
   const handlePrevStep = () => {
-    if (currentStep === 'products') setCurrentStep('url');
+    if (currentStep === 'auth') setCurrentStep('url');
+    else if (currentStep === 'products') setCurrentStep('auth');
     else if (currentStep === 'preferences') setCurrentStep('products');
     else if (currentStep === 'results') setCurrentStep('preferences');
     setError('');
@@ -170,13 +229,14 @@ export default function HomePage() {
 
 
 
-  const resetForm = () => {
+  const _resetForm = () => {
     setResult(null);
     setUrl('');
     setError('');
     setCurrentStep('url');
     setSelectedProducts([]);
     setCopiedCaption(null);
+    clearState(); // Clear persisted state
   };
 
   return (
@@ -194,19 +254,44 @@ export default function HomePage() {
             </div>
             <span className="font-bold text-xl text-white">StoreCalendar</span>
           </div>
-          <nav className="flex gap-6">
-            <a href="#features" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
-              Features
-            </a>
-            <a href="#testimonials" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
-              Reviews
-            </a>
-            <a href="#pricing" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
-              Pricing
-            </a>
-            <a href="#faq" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
-              FAQ
-            </a>
+          <nav className="flex gap-6 items-center">
+            {!user ? (
+              <>
+                <a href="#features" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                  Features
+                </a>
+                <a href="#testimonials" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                  Reviews
+                </a>
+                <a href="#pricing" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                  Pricing
+                </a>
+                <a href="#faq" className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
+                  FAQ
+                </a>
+              </>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  {user.picture && (
+                    <Image 
+                      src={user.picture} 
+                      alt={user.name}
+                      width={32}
+                      height={32}
+                      className="rounded-full"
+                    />
+                  )}
+                  <span className="text-white/90 text-sm">{user.name}</span>
+                </div>
+                <Button
+                  onClick={logout}
+                  className="bg-white/10 hover:bg-white/20 text-white text-sm px-3 py-1 rounded-lg border border-white/20 transition-all duration-300"
+                >
+                  Logout
+                </Button>
+              </div>
+            )}
           </nav>
         </div>
       </header>
@@ -221,10 +306,7 @@ export default function HomePage() {
           <p className="text-xl text-white/70 mb-12 max-w-3xl mx-auto leading-relaxed">
             Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
           </p>
-          <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl px-6 py-4 mb-8 max-w-2xl mx-auto border border-blue-400/30">
-            <p className="text-blue-300 font-semibold text-lg">🎆 Free to start! Unlimited calendars coming soon at $29/month</p>
-            <p className="text-white/80 text-sm mt-1">Join the waitlist for premium features • WooCommerce coming Month 2</p>
-          </div>
+         
               
               {/* V1 Multi-Step Generator Form */}
               <div id="generator-form" className="relative bg-white/10 backdrop-blur-2xl rounded-3xl p-8 mb-16 max-w-4xl mx-auto border border-white/20 shadow-2xl">
@@ -287,7 +369,38 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Step 2: Product Selection */}
+                  {/* Step 2: Authentication */}
+                  {currentStep === 'auth' && (
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <h3 className="text-2xl font-bold text-white mb-2">
+                          Sign in to continue
+                        </h3>
+                        <p className="text-white/70 mb-8">
+                          Create your weekly content calendar with AI
+                        </p>
+                        
+                        <div className="flex justify-center">
+                          <GoogleLoginButton />
+                        </div>
+                        
+                        <p className="text-sm text-white/50 mt-8">
+                          By signing in, you agree to our Terms of Service and Privacy Policy
+                        </p>
+                        
+                        <div className="mt-6">
+                          <Button
+                            onClick={handlePrevStep}
+                            className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-xl border border-white/20 transition-all duration-300"
+                          >
+                            ← Back to URL
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Product Selection */}
                   {currentStep === 'products' && result?.enhanced_products && (
                     <div className="space-y-6">
                       <ProductSelector
@@ -301,24 +414,12 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Step 3: Preferences (Country + Brand Tone) */}
+                  {/* Step 4: Preferences (Country + Brand Tone) */}
                   {currentStep === 'preferences' && (
                     <div className="space-y-6">
                       <div className="text-center mb-4">
                         <h3 className="text-lg font-medium text-white mb-2">Set Your Preferences</h3>
-                        <p className="text-sm text-white/70">Choose your country for holiday-aware content and select your brand voice</p>
-                        
-                        {/* Usage tracker */}
-                        <div className="mt-3 p-3 bg-blue-500/20 backdrop-blur-sm rounded-xl border border-blue-400/30">
-                          <p className="text-blue-300 text-sm font-semibold">
-                            Daily usage: {dailyUsage}/3 free calendars
-                          </p>
-                          {dailyUsage >= 2 && (
-                            <p className="text-yellow-300 text-xs mt-1">
-                              {dailyUsage === 2 ? '1 more free calendar today!' : 'Upgrade for unlimited calendars'}
-                            </p>
-                          )}
-                        </div>
+                        <p className="text-sm text-white/70">Choose your country for holiday-aware content and select your brand voice</p>                        
                       </div>
                       
                       <div className="space-y-4">
@@ -336,7 +437,7 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Step 4: Results */}
+                  {/* Step 5: Results */}
                   {currentStep === 'results' && result?.weekly_calendar && (
                     <div className="space-y-6">
                       <WeeklyCalendar
@@ -348,6 +449,15 @@ export default function HomePage() {
                         }}
                       />
                       
+                      {/* Share Calendar Button */}
+                      {result.calendar_id && (
+                        <ShareCalendarButton 
+                          calendarId={result.calendar_id}
+                          title={`${result.store_name} - Week ${weekNumber} Calendar`}
+                          description={`AI-generated social media calendar for ${result.store_name}`}
+                        />
+                      )}
+
                       {weekNumber === 1 && (
                         <div className="text-center">
                           <Button
@@ -370,7 +480,7 @@ export default function HomePage() {
                   )}
 
                   {/* Navigation Buttons */}
-                  {currentStep !== 'results' && (
+                  {currentStep !== 'results' && currentStep !== 'auth' && (
                     <div className="flex items-center justify-between pt-6">
                       {currentStep !== 'url' ? (
                         <Button

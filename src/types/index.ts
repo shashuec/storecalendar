@@ -110,4 +110,16 @@ export interface GenerationResponse {
   weekly_calendar?: WeeklyCalendar;
   upcoming_holidays?: Holiday[];
   enhanced_products?: ShopifyProductEnhanced[];
+  calendar_id?: string; // For sharing functionality
+}
+
+// User authentication types
+export interface User {
+  id: string;
+  google_id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  created_at: string;
+  updated_at: string;
 }

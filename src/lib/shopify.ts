@@ -1,4 +1,4 @@
-import { ShopifyProduct, ShopifyProductEnhanced } from '@/types';
+import { ShopifyProductEnhanced } from '@/types';
 
 export async function scrapeShopifyStore(url: string, limit: number = 50): Promise<{
   storeName: string;
