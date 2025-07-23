@@ -9,6 +9,7 @@ import { CountrySelectorCompact } from '@/components/CountrySelector';
 import { ProductSelector } from '@/components/ProductSelector';
 import { BrandToneSelectorCompact } from '@/components/BrandToneSelector';
 import { WeeklyCalendar } from '@/components/WeeklyCalendar';
+import { FeedbackModal } from '@/components/FeedbackModal';
 import { smartSelectProducts } from '@/lib/product-ranking';
 import { useAuth } from '@/contexts/AuthContext';
 import GoogleLoginButton from '@/components/GoogleLoginButton';
@@ -42,6 +43,28 @@ export default function HomePage() {
   // Freemium usage tracking
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  
+  // Feedback modal state
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+
+  // Reset all state and go to homepage
+  const resetToHomepage = useCallback(() => {
+    setUrl('');
+    setLoading(false);
+    setResult(null);
+    setError('');
+    setCurrentStep('url');
+    setSelectedCountry('US');
+    setSelectedProducts([]);
+    setSelectedTone('casual');
+    setWeekNumber(1);
+    setCopiedCaption(null);
+    setShowUpgradePrompt(false);
+    setShowFeedbackModal(false);
+    
+    // Clear any localStorage data if needed
+    // localStorage.removeItem('someKey'); // Add if you have persisted data
+  }, []);
   
   // Check usage on component mount
   useEffect(() => {
@@ -193,6 +216,10 @@ export default function HomePage() {
           setCurrentStep('preferences');
         } else if (currentStep === 'preferences') {
           setCurrentStep('results');
+          // Show feedback modal after calendar is generated
+          setTimeout(() => {
+            setShowFeedbackModal(true);
+          }, 2000); // Wait 2 seconds for user to see the results
         }
 
       } else {
@@ -310,7 +337,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="relative px-4 lg:px-6 h-16 sm:h-20 flex items-center border-b border-white/10 bg-black/20 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={resetToHomepage}>
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-sm sm:text-lg">SC</span>
             </div>
@@ -447,14 +474,14 @@ export default function HomePage() {
                           By signing in, you agree to our Terms of Service and Privacy Policy
                         </p>
                         
-                        <div className="mt-4 sm:mt-6">
+                        {/* <div className="mt-4 sm:mt-6">
                           <Button
                             onClick={handlePrevStep}
                             className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base"
                           >
                             ← Back to URL
                           </Button>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
                   )}
@@ -629,54 +656,158 @@ export default function HomePage() {
               {/* Demo Video Section */}
               <DemoVideo className="max-w-6xl mx-auto mb-8 sm:mb-16" />
 
-              {/* Demo Preview */}
-              <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto border border-white/20 shadow-2xl">
+              {/* Demo Preview - Real Calendar Style */}
+              <div className="relative bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto border border-white/20 shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-2xl sm:rounded-3xl" />
-                <div className="relative text-left">
+                <div className="relative">
                   <div className="text-xs sm:text-sm text-white/60 mb-4 sm:mb-6 text-center px-2">📅 Example week for: E-commerce Store (Organic Cotton T-Shirts)</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-3">
-                      <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-indigo-400">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span>📅</span>
-                          <strong className="text-indigo-300">Monday - Product Showcase</strong>
+                  
+                  {/* Calendar Grid - Matches WeeklyCalendar component */}
+                  <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mb-6">
+                    
+                    {/* Monday - Product Showcase */}
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px]">
+                      <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+                            <span className="text-white font-bold text-xs sm:text-sm">MON</span>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-white text-sm sm:text-base">Monday</h3>
+                            <p className="text-xs sm:text-sm text-white/60">Jan 15, 2024</p>
+                          </div>
                         </div>
-                        <p className="text-white/90">&ldquo;New week, new comfort! 🌟 Our organic cotton tees are perfect for Monday motivation. Soft, sustainable, stylish.&rdquo;</p>
+                        <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-md sm:rounded-lg truncate max-w-[100px] sm:max-w-[120px]">
+                          Product Showcase
+                        </span>
                       </div>
-                      <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-green-400">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span>🎯</span>
-                          <strong className="text-green-300">Tuesday - Benefits Focus</strong>
-                        </div>
-                        <p className="text-white/90">&ldquo;Tuesday Truth: Organic cotton is breathable, hypoallergenic, and eco-friendly. Your skin will thank you! 🌱&rdquo;</p>
+                      
+                      <div className="mb-3 sm:mb-4 rounded-lg sm:rounded-xl overflow-hidden relative h-32 sm:h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                        <span className="text-white text-4xl">👕</span>
                       </div>
-                      <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-yellow-400">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span>⭐</span>
-                          <strong className="text-yellow-300">Wednesday - Social Proof</strong>
-                        </div>
-                        <p className="text-white/90">&ldquo;⭐⭐⭐⭐⭐ &lsquo;Best investment for my wardrobe!&rsquo; - Sarah M. Join hundreds of happy customers! 💛&rdquo;</p>
+                      
+                      <div className="mb-3 sm:mb-4 flex-1">
+                        <p className="text-white/90 text-xs sm:text-sm leading-relaxed break-words overflow-hidden">
+                          New week, new comfort! 🌟 Our organic cotton tees are perfect for Monday motivation. Soft, sustainable, stylish - everything you need to start strong!
+                        </p>
                       </div>
+                      
+                      <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                        <h4 className="font-medium text-white text-xs sm:text-sm mb-1 truncate">Organic Cotton T-Shirt</h4>
+                        <p className="text-white/60 text-xs mb-1 sm:mb-2">$29.99</p>
+                        <p className="text-white/50 text-xs line-clamp-2 break-words">Premium organic cotton tee in forest green</p>
+                      </div>
+                      
+                      <button className="w-full bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-medium py-2 px-3 sm:px-4 rounded-lg border border-white/20 transition-all duration-300 flex items-center justify-center gap-2 mt-auto">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Caption
+                      </button>
                     </div>
-                    <div className="space-y-3">
-                      <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-purple-400">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span>👕</span>
-                          <strong className="text-purple-300">Thursday - Style Tips</strong>
+
+                    {/* Tuesday - Benefits Focus */}
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px]">
+                      <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-green-500 to-teal-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+                            <span className="text-white font-bold text-xs sm:text-sm">TUE</span>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-white text-sm sm:text-base">Tuesday</h3>
+                            <p className="text-xs sm:text-sm text-white/60">Jan 16, 2024</p>
+                          </div>
                         </div>
-                        <p className="text-white/90">&ldquo;Thursday styling: Layer your organic tee under a blazer for that perfect work-to-weekend transition! ✨&rdquo;</p>
+                        <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded-md sm:rounded-lg truncate max-w-[100px] sm:max-w-[120px]">
+                          Benefits Focus
+                        </span>
                       </div>
-                      <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl text-sm border-l-4 border-orange-400">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span>🎉</span>
-                          <strong className="text-orange-300">Friday - Holiday Aware</strong>
+                      
+                      <div className="mb-3 sm:mb-4 rounded-lg sm:rounded-xl overflow-hidden relative h-32 sm:h-48 bg-gradient-to-br from-green-400 to-teal-600 flex items-center justify-center">
+                        <span className="text-white text-4xl">🌱</span>
+                      </div>
+                      
+                      <div className="mb-3 sm:mb-4 flex-1">
+                        <p className="text-white/90 text-xs sm:text-sm leading-relaxed break-words overflow-hidden">
+                          Tuesday Truth: Organic cotton is breathable, hypoallergenic, and eco-friendly. Your skin will thank you! 🌱 Perfect for sensitive skin and conscious living.
+                        </p>
+                      </div>
+                      
+                      <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                        <h4 className="font-medium text-white text-xs sm:text-sm mb-1 truncate">Organic Cotton T-Shirt</h4>
+                        <p className="text-white/60 text-xs mb-1 sm:mb-2">$29.99</p>
+                        <p className="text-white/50 text-xs line-clamp-2 break-words">Breathable and hypoallergenic fabric</p>
+                      </div>
+                      
+                      <button className="w-full bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-medium py-2 px-3 sm:px-4 rounded-lg border border-white/20 transition-all duration-300 flex items-center justify-center gap-2 mt-auto">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Caption
+                      </button>
+                    </div>
+
+                    {/* Wednesday - Social Proof */}
+                    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px]">
+                      <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-lg sm:rounded-xl flex items-center justify-center">
+                            <span className="text-white font-bold text-xs sm:text-sm">WED</span>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-white text-sm sm:text-base">Wednesday</h3>
+                            <p className="text-xs sm:text-sm text-white/60">Jan 17, 2024</p>
+                          </div>
                         </div>
-                        <p className="text-white/90">&ldquo;Friday feeling + Earth Day vibes! 🌍 Our organic cotton celebrates sustainable fashion. Perfect timing!&rdquo;</p>
+                        <span className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded-md sm:rounded-lg truncate max-w-[100px] sm:max-w-[120px]">
+                          Social Proof
+                        </span>
                       </div>
-                      <div className="text-center text-white/60 text-sm p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
-                        + Weekend content<br/>
-                        <span className="text-xs">(Behind-the-scenes, Call-to-action)</span>
+                      
+                      <div className="mb-3 sm:mb-4 rounded-lg sm:rounded-xl overflow-hidden relative h-32 sm:h-48 bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center">
+                        <span className="text-white text-4xl">⭐</span>
                       </div>
+                      
+                      <div className="mb-3 sm:mb-4 flex-1">
+                        <p className="text-white/90 text-xs sm:text-sm leading-relaxed break-words overflow-hidden">
+                          ⭐⭐⭐⭐⭐ &lsquo;Best investment for my wardrobe!&rsquo; - Sarah M. Join hundreds of happy customers who love the quality and comfort! 💛
+                        </p>
+                      </div>
+                      
+                      <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+                        <h4 className="font-medium text-white text-xs sm:text-sm mb-1 truncate">Organic Cotton T-Shirt</h4>
+                        <p className="text-white/60 text-xs mb-1 sm:mb-2">$29.99</p>
+                        <p className="text-white/50 text-xs line-clamp-2 break-words">4.8/5 stars from 200+ reviews</p>
+                      </div>
+                      
+                      <button className="w-full bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-medium py-2 px-3 sm:px-4 rounded-lg border border-white/20 transition-all duration-300 flex items-center justify-center gap-2 mt-auto">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Copy Caption
+                      </button>
+                    </div>
+
+                    {/* Remaining days preview */}
+                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 flex flex-col items-center justify-center min-h-[200px] text-center">
+                      <div className="text-white/60 mb-2">
+                        <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </div>
+                      <p className="text-white/70 text-sm font-medium mb-1">+ 4 More Days</p>
+                      <p className="text-white/50 text-xs">Thursday: Style Tips</p>
+                      <p className="text-white/50 text-xs">Friday: Holiday Aware</p>
+                      <p className="text-white/50 text-xs">Weekend: Behind-the-scenes & CTA</p>
+                    </div>
+
+                  </div>
+
+                  {/* Calendar Info */}
+                  <div className="text-center p-4 sm:p-6 bg-white/5 backdrop-blur-sm rounded-lg sm:rounded-xl border border-white/10">
+                    <div className="text-center">
+                      <p className="text-white/80 text-xs sm:text-sm">Calendar for Week 1</p>
+                      <p className="text-white/50 text-xs mt-1">7 posts • US • Casual tone</p>
                     </div>
                   </div>
                 </div>
@@ -1232,6 +1363,13 @@ export default function HomePage() {
           <p className="text-white/60 text-xs sm:text-sm px-4">&copy; 2024 StoreCalendar. E-commerce content automation platform starting with Shopify.</p>
         </div>
       </footer>
+
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        storeName={result?.store_name}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, memo, useCallback } from 'react';
+import { useState, useMemo, memo, useCallback, useEffect } from 'react';
 import { ShopifyProductEnhanced } from '@/types';
 import { filterProductsByQuery, getProductTypeSuggestions } from '@/lib/product-ranking';
 
@@ -51,6 +51,24 @@ export const ProductSelector = memo(function ProductSelector({
 
   // Get unique product types for filter dropdown
   const _productTypes = useMemo(() => getProductTypeSuggestions(products), [products]);
+
+  // Auto-select first 5 products after showing, skipping already selected ones
+  useEffect(() => {
+    if (products.length > 0 && selectedProducts.length === 0) {
+      // Get the first 5 products that aren't already selected
+      const availableProducts = productsToDisplay.filter(product => 
+        !selectedProducts.includes(product.id)
+      );
+      
+      const autoSelectIds = availableProducts
+        .slice(0, Math.min(5, maxSelection))
+        .map(product => product.id);
+      
+      if (autoSelectIds.length > 0) {
+        onSelectionChange(autoSelectIds);
+      }
+    }
+  }, [products, productsToDisplay, selectedProducts, maxSelection, onSelectionChange]);
 
   const handleProductToggle = useCallback((productId: string) => {
     if (disabled) return;

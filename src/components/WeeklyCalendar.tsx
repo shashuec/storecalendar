@@ -107,6 +107,18 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
     }
   };
 
+  const handlePostClick = useCallback((post: CalendarPost, event: React.MouseEvent) => {
+    // Don't open product if clicking on copy button
+    if ((event.target as HTMLElement).closest('button')) {
+      return;
+    }
+    
+    // Open product URL in new window if available
+    if (post.product_featured?.url) {
+      window.open(post.product_featured.url, '_blank', 'noopener,noreferrer');
+    }
+  }, []);
+
   const posts = calendar.posts || [];
 
   return (
@@ -116,7 +128,9 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
         {posts.map((post) => (
           <div
             key={post.id}
-            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px]"
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px] cursor-pointer"
+            onClick={(event) => handlePostClick(post, event)}
+            title={post.product_featured?.url ? `Click to view ${post.product_featured.name}` : 'Product page not available'}
           >
             {/* Day Header */}
             <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
@@ -131,7 +145,7 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
                   <p className="text-xs sm:text-sm text-white/60">{new Date(post.date).toLocaleDateString('en-US')}</p>
                 </div>
               </div>
-              <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-md sm:rounded-lg truncate max-w-[100px] sm:max-w-[120px]">
+              <span className="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-md sm:rounded-lg max-w-[70px] sm:max-w-[120px]">
                 {post.post_type}
               </span>
             </div>
@@ -185,7 +199,10 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
 
             {/* Copy Button */}
             <button
-              onClick={() => handleCopyPost(post)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent post click
+                handleCopyPost(post);
+              }}
               className="w-full bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-medium py-2 px-3 sm:px-4 rounded-lg border border-white/20 transition-all duration-300 flex items-center justify-center gap-2 mt-auto"
             >
               {copiedPost === post.id ? (

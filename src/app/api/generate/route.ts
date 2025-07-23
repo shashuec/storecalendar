@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeShopifyStore, validateShopifyUrlFormat } from '@/lib/shopify';
 import { generateAllCaptions } from '@/lib/openai';
-// TEMPORARILY DISABLED - Rate limiting imports
-// import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
+import { checkRateLimit, checkGlobalRateLimit, getClientIP } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
 import { GenerationResponse, CountryCode, BrandTone, ShopifyProductEnhanced, CalendarPost } from '@/types';
 import { isValidCountryCode } from '@/lib/country-detection';
@@ -81,9 +80,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // TEMPORARILY DISABLED - Rate limits
-    // To re-enable: uncomment the code below
-    /*
+    //  Rate limits
     const clientIP = getClientIP(request);
     const [ipRateLimit, globalRateLimit] = await Promise.all([
       checkRateLimit(clientIP),
@@ -111,10 +108,9 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-    */
     
     // Check if we have cached data (within 6 hours)
-    const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const cleanUrl = shopify_url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
     
     // Try to get existing store data

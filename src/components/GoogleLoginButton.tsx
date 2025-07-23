@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ButtonLoader } from '@/components/Loader';
 
-export default function GoogleLoginButton() {
+interface GoogleLoginButtonProps {
+  loading?: boolean;
+  setLoading?: (loading: boolean) => void;
+}
+
+export default function GoogleLoginButton({ loading = false, setLoading }: GoogleLoginButtonProps) {
   const { login } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = () => {
-    setIsLoading(true);
+    if (setLoading) {
+      setLoading(true);
+    }
     // The login function will redirect, so the loading state will be cleared by navigation
     login();
   };
@@ -17,10 +22,10 @@ export default function GoogleLoginButton() {
   return (
     <button
       onClick={handleLogin}
-      disabled={isLoading}
+      disabled={loading}
       className="flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {isLoading ? (
+      {loading ? (
         <>
           <ButtonLoader size="small" />
           <span className="text-gray-700 font-medium">Signing in...</span>
