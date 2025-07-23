@@ -49,14 +49,14 @@ export function Modal({ isOpen, onClose, children, className = '' }: ModalProps)
       />
       
       {/* Modal Content */}
-      <div className={`relative z-10 w-full max-w-md mx-4 ${className}`}>
+      <div className={`relative z-10 w-full max-w-md mx-3 sm:mx-4 ${className}`}>
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute -top-2 -right-2 z-20 w-8 h-8 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-sm border border-white/20"
+          className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 z-20 w-7 h-7 sm:w-8 sm:h-8 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all duration-300 backdrop-blur-sm border border-white/20"
           aria-label="Close modal"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>

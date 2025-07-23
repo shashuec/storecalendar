@@ -52,15 +52,11 @@ export const ProductSelector = memo(function ProductSelector({
   // Get unique product types for filter dropdown
   const _productTypes = useMemo(() => getProductTypeSuggestions(products), [products]);
 
-  // Auto-select first 5 products after showing, skipping already selected ones
+  // Auto-select first 5 products from mapped list, ignoring parent selections
   useEffect(() => {
     if (products.length > 0 && selectedProducts.length === 0) {
-      // Get the first 5 products that aren't already selected
-      const availableProducts = productsToDisplay.filter(product => 
-        !selectedProducts.includes(product.id)
-      );
-      
-      const autoSelectIds = availableProducts
+      // Always select the first 5 products from the displayed list, regardless of parent selections
+      const autoSelectIds = productsToDisplay
         .slice(0, Math.min(5, maxSelection))
         .map(product => product.id);
       

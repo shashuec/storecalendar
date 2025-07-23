@@ -92,14 +92,14 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
   const renderContent = () => {
     if (step === 'submitted') {
       return (
-        <div className="text-center py-6">
-          <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center py-4 sm:py-6 px-4 sm:px-6">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+            <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-3">Thank you for your feedback!</h3>
-          <p className="text-white/70 text-sm mb-4">
+          <h3 className="text-lg sm:text-xl font-semibold text-white mb-2 sm:mb-3">Thank you for your feedback!</h3>
+          <p className="text-white/70 text-sm mb-3 sm:mb-4">
             Your input helps us improve StoreCalendar for everyone.
           </p>
           <p className="text-white/50 text-xs">
@@ -111,44 +111,44 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
 
     if (step === 'improvement') {
       return (
-        <div className="py-2">
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="py-4 px-4 sm:px-6">
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Help us improve!</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-2">Help us improve!</h3>
             <p className="text-white/70 text-sm">
               What can we do to make StoreCalendar better for you?
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <textarea
               value={improvementText}
               onChange={(e) => setImprovementText(e.target.value)}
               placeholder="Please share your suggestions for improvement..."
               disabled={loading}
-              className="w-full h-24 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
+              className="w-full h-20 sm:h-24 px-3 sm:px-4 py-2 sm:py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
             />
 
             {error && (
               <p className="text-red-400 text-sm">{error}</p>
             )}
 
-            <div className="flex gap-3 justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
               <button
                 onClick={() => setStep('initial')}
                 disabled={loading}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg border border-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg border border-white/20 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed order-2 sm:order-1"
               >
                 Back
               </button>
               <button
                 onClick={handleImprovementSubmit}
                 disabled={loading || !improvementText.trim()}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 order-1 sm:order-2"
               >
                 {loading && (
                   <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -165,15 +165,15 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
     }
 
     return (
-      <div className="text-center py-2">
-        <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="text-center py-4 px-4 sm:px-6">
+        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M12 5v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
         
-        <h3 className="text-xl font-semibold text-white mb-2 px-4">How was your experience?</h3>
-        <p className="text-white/70 text-sm mb-8 px-4">
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">How was your experience?</h3>
+        <p className="text-white/70 text-sm mb-6 sm:mb-8">
           {storeName ? `We generated a calendar for ${storeName}. ` : ''}
           Did you find StoreCalendar helpful?
         </p>
@@ -182,11 +182,11 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
           <p className="text-red-400 text-sm mb-4">{error}</p>
         )}
 
-        <div className="flex gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
           <button
             onClick={handleYesClick}
             disabled={loading}
-            className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transform hover:scale-105"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transform hover:scale-105"
           >
             {loading && (
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -200,13 +200,13 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
           <button
             onClick={handleNoClick}
             disabled={loading}
-            className="px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
           >
             👎 Could be better
           </button>
         </div>
 
-        <p className="text-white/50 text-xs mt-6">
+        <p className="text-white/50 text-xs mt-4 sm:mt-6">
           Your feedback helps us improve the experience for everyone
         </p>
       </div>
@@ -214,8 +214,8 @@ export function FeedbackModal({ isOpen, onClose, storeName }: FeedbackModalProps
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-md">
-      <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl">
+    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-sm sm:max-w-md">
+      <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl">
         {renderContent()}
       </div>
     </Modal>
