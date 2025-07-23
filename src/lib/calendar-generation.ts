@@ -106,7 +106,7 @@ export async function generateWeeklyCalendar(
   // Get holidays for the week
   const _weekStart = new Date(startDate);
   const _weekEnd = new Date(endDate);
-  const weekHolidays = await getUpcomingHolidays(country, 7);
+  const weekHolidays = getUpcomingHolidays(country, 7); // Remove await - not async
   
   // Create holiday map by date
   const holidayMap = new Map();
@@ -208,7 +208,29 @@ function createFallbackCaption(product: ShopifyProduct, postType: string, brandT
   const productName = product.name;
   const price = product.price;
   const productLink = product.url ? `\n\n🛒 Shop now: ${product.url}` : '';
-  const holidayContext = holiday ? ` Perfect for ${holiday.name}!` : '';
+  // Enhanced holiday integration for fallbacks
+  let holidayContext = '';
+  if (holiday) {
+    switch (holiday.type) {
+      case 'gift-giving':
+        holidayContext = ` Perfect ${holiday.name} gift idea!`;
+        break;
+      case 'shopping':
+        holidayContext = ` Don't miss out this ${holiday.name}!`;
+        break;
+      case 'celebration':
+        holidayContext = ` Celebrate ${holiday.name} in style!`;
+        break;
+      case 'seasonal':
+        holidayContext = ` Perfect timing for ${holiday.name}!`;
+        break;
+      case 'festival':
+        holidayContext = ` Make your ${holiday.name} special!`;
+        break;
+      default:
+        holidayContext = ` Perfect for ${holiday.name}!`;
+    }
+  }
   
   switch (postType) {
     case 'Product Showcase':
@@ -237,40 +259,61 @@ function createFallbackCaption(product: ShopifyProduct, postType: string, brandT
   }
 }
 
-// Get subtle holiday mention for post types
+// Get enhanced holiday mention for post types
 function getHolidayMention(holiday: Holiday, postType: string): string | null {
   const holidayName = holiday.name;
   
   switch (holiday.type) {
     case 'gift-giving':
       if (postType === 'Product Showcase') {
-        return `Perfect for ${holidayName}!`;
+        return `🎁 Perfect ${holidayName} gift!`;
       }
       if (postType === 'Call-to-Action') {
-        return `${holidayName} is coming!`;
+        return `⏰ ${holidayName} is almost here!`;
+      }
+      if (postType === 'Benefits-Focused') {
+        return `🎁 Make ${holidayName} memorable!`;
       }
       break;
       
     case 'shopping':
       if (postType === 'Product Showcase' || postType === 'Call-to-Action') {
-        return `${holidayName} ready!`;
+        return `🛍️ ${holidayName} deals inside!`;
+      }
+      if (postType === 'Benefits-Focused') {
+        return `💰 ${holidayName} savings ahead!`;
       }
       break;
       
     case 'seasonal':
       if (postType === 'Benefits-Focused' || postType === 'How-to') {
-        return `As ${holidayName.toLowerCase()} arrives,`;
+        return `🍂 Perfect for ${holidayName}!`;
+      }
+      if (postType === 'Product Showcase') {
+        return `🌟 ${holidayName} vibes!`;
       }
       break;
       
     case 'celebration':
       if (postType === 'Testimonial' || postType === 'Behind-Scenes') {
-        return `Celebrating ${holidayName}!`;
+        return `🎉 Celebrating ${holidayName}!`;
+      }
+      if (postType === 'Product Showcase') {
+        return `✨ ${holidayName} ready!`;
+      }
+      break;
+      
+    case 'festival':
+      if (postType === 'Product Showcase') {
+        return `🪔 Perfect for ${holidayName}!`;
+      }
+      if (postType === 'Benefits-Focused') {
+        return `🎊 Make ${holidayName} special!`;
       }
       break;
   }
   
-  return null;
+  return `🎯 Perfect for ${holidayName}!`; // Default fallback
 }
 
 // Export calendar to CSV format

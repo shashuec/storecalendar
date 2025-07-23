@@ -76,9 +76,24 @@ export async function generateCaptions(
       
       // Get upcoming holidays for context
       const upcomingHolidays = getUpcomingHolidays(country, 14); // Next 2 weeks
-      const holidayContext = upcomingHolidays.length > 0 
-        ? `\n\nUpcoming holidays to consider (optional, only if relevant): ${upcomingHolidays.slice(0, 3).map(h => `${h.name} (${h.date})`).join(', ')}`
-        : '';
+      
+      // Strengthen holiday context integration
+      let holidayContext = '';
+      if (upcomingHolidays.length > 0) {
+        const nextHolidays = upcomingHolidays.slice(0, 3);
+        const holidayTypes = nextHolidays.map(h => h.type).join(', ');
+        holidayContext = `\n\n🎯 HOLIDAY INTEGRATION REQUIRED:
+Upcoming holidays: ${nextHolidays.map(h => `${h.name} (${h.date}, ${h.type})`).join(', ')}
+
+MUST incorporate holiday themes naturally by:
+- For gift-giving holidays: Emphasize product as perfect gift, mention gifting occasions
+- For shopping holidays: Create urgency, mention sales/deals context  
+- For celebration holidays: Use festive language, celebratory tone
+- For seasonal holidays: Connect product to season, weather, or timing
+- For festival/cultural holidays: Respect cultural significance, use appropriate language
+
+Make holiday connection feel natural and relevant to the product.`;
+      }
       
       // Create style descriptions for the prompt
       const styleDescriptions = styles.map(style => `
@@ -102,7 +117,8 @@ For each caption:
 - Include 2-3 relevant hashtags max
 - Make it sound natural and engaging
 - Include product name naturally
-- If relevant, subtly reference upcoming holidays (don't force it)
+- PRIORITY: Integrate upcoming holidays meaningfully (see holiday integration requirements above)
+- Use holiday-specific language, timing, and emotional triggers when holidays are present
 - Always end with a call-to-action link: "\\n\\n🛒 Shop now: [product URL]" if URL is available
 
 Return ONLY a JSON object with this exact format:
