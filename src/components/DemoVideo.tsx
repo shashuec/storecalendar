@@ -75,8 +75,8 @@ export default function DemoVideo({ className = '' }: DemoVideoProps) {
 
   return (
     <div className={`w-full ${className}`}>
-      <div className="relative bg-white/10 backdrop-blur-2xl rounded-xl sm:rounded-2xl p-2 sm:p-6 lg:p-8 border border-white/20 shadow-2xl max-w-6xl mx-auto">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 rounded-xl sm:rounded-2xl" />
+      <div className="relative bg-white/10  backdrop-blur-2xl rounded-xl sm:rounded-2xl p-2 sm:p-6 lg:p-8 border border-white/20 shadow-2xl max-w-6xl mx-auto">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-800/30 to-slate-700/30 rounded-xl sm:rounded-2xl" />
         <div className="relative">
           {/* Video Title - Optimized for mobile */}
           <div className="text-center mb-2 sm:mb-6">
@@ -89,9 +89,7 @@ export default function DemoVideo({ className = '' }: DemoVideoProps) {
           {/* Video Container */}
           <div className="relative rounded-lg sm:rounded-xl overflow-hidden shadow-2xl bg-black/20">
             <video
-              autoPlay
-              loop
-              muted
+              controls
               playsInline
               preload="metadata"
               className="w-full aspect-video object-cover bg-black"

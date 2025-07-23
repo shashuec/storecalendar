@@ -5,8 +5,8 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
   products: ShopifyProductEnhanced[];
 }> {
   try {
-    // Normalize URL - remove protocol, trailing slash, and query parameters
-    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Normalize URL - remove protocol, www., trailing slash, and query parameters
+    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
     const domainPart = cleanUrl.split('?')[0].split('/')[0];
     const shopifyUrl = `https://${domainPart}`;
     
@@ -82,7 +82,7 @@ export async function scrapeShopifyStore(url: string, limit: number = 50): Promi
 
 export async function validateShopifyUrl(url: string): Promise<boolean> {
   try {
-    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const cleanUrl = url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
     const domainPart = cleanUrl.split('?')[0].split('/')[0];
     
     // Basic URL format validation
@@ -107,7 +107,7 @@ export async function validateShopifyUrl(url: string): Promise<boolean> {
 export function validateShopifyUrlFormat(url: string): boolean {
   try {
     // Clean and normalize the URL
-    const cleanUrl = url.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const cleanUrl = url.trim().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
     
     // Extract just the domain part (before query parameters or paths)
     const domainPart = cleanUrl.split('?')[0].split('/')[0];
