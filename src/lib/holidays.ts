@@ -108,9 +108,9 @@ const INDIA_HOLIDAYS_2025: Holiday[] = [
   { date: '2025-05-12', name: 'Mother\'s Day', type: 'gift-giving' },
   { date: '2025-06-15', name: 'Father\'s Day', type: 'gift-giving' },
   { date: '2025-06-21', name: 'International Yoga Day', type: 'celebration' },
-  { date: '2025-07-13', name: 'Guru Purnima', type: 'festival' },
-  { date: '2025-08-15', name: 'Independence Day', type: 'patriotic' },
-  { date: '2025-08-16', name: 'Janmashtami', type: 'festival' },
+  { date: '2025-07-23', name: 'Guru Purnima', type: 'festival' },          // 2025-07-13
+  { date: '2025-07-25', name: 'Independence Day', type: 'patriotic' },          // 2025-08-15
+  { date: '2025-07-26', name: 'Janmashtami', type: 'festival' },              //  2025-08-16
   { date: '2025-08-27', name: 'Ganesh Chaturthi', type: 'festival' },
   { date: '2025-09-06', name: 'Ganesh Visarjan', type: 'festival' },
   { date: '2025-09-22', name: 'Autumn Equinox', type: 'seasonal' },

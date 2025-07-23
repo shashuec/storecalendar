@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
       
       if (cachedCaptions && cachedCaptions.length > 0 && !force_refresh) {
         // Transform cached captions to match expected format
-        console.log('Using cached captions - no AI call needed');
+        console.log(`Found ${cachedCaptions.length} cached captions`);
         const captionsByProduct = new Map();
         
         cachedCaptions.forEach(caption => {
@@ -331,7 +331,33 @@ export async function POST(request: NextRequest) {
           }
         });
         
-        captionResults = Array.from(captionsByProduct.values());
+        const cachedResults = Array.from(captionsByProduct.values());
+        
+        // Check if we have captions for ALL selected products
+        const productsWithCache = new Set(cachedResults.map(r => r.product.id));
+        const productsNeedingCaptions = finalProducts.filter(p => !productsWithCache.has(p.id));
+        
+        if (productsNeedingCaptions.length > 0) {
+          console.log(`Generating captions for ${productsNeedingCaptions.length} products without cache`);
+          const countryParam: CountryCode = country || 'US';
+          const toneParam: BrandTone = brand_tone || 'casual';
+          
+          // Generate captions for missing products
+          const newCaptionResults = await generateAllCaptions(
+            productsNeedingCaptions,
+            storeName,
+            storeData.id,
+            toneParam,
+            countryParam
+          );
+          
+          // Combine cached and new results
+          captionResults = [...cachedResults, ...newCaptionResults];
+          console.log(`Total captions: ${cachedResults.length} cached + ${newCaptionResults.length} new = ${captionResults.length}`);
+        } else {
+          console.log('Using only cached captions - all products covered');
+          captionResults = cachedResults;
+        }
       } else {
         // No cached captions - generate new ones for selected products
         console.log('Generating captions for selected products');
