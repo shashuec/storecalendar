@@ -46,24 +46,37 @@ export default function HomePage() {
   
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  
+  // Calendar generation progress
+  const [generatingDay, setGeneratingDay] = useState(1);
+  
+  // Logo reset loading state
+  const [isResetting, setIsResetting] = useState(false);
 
   // Reset all state and go to homepage
   const resetToHomepage = useCallback(() => {
-    setUrl('');
-    setLoading(false);
-    setResult(null);
-    setError('');
-    setCurrentStep('url');
-    setSelectedCountry('US');
-    setSelectedProducts([]);
-    setSelectedTone('casual');
-    setWeekNumber(1);
-    setCopiedCaption(null);
-    setShowUpgradePrompt(false);
-    setShowFeedbackModal(false);
+    setIsResetting(true);
     
-    // Clear any localStorage data if needed
-    // localStorage.removeItem('someKey'); // Add if you have persisted data
+    // Show loading then reset everything
+    setTimeout(() => {
+      setUrl('');
+      setLoading(false);
+      setResult(null);
+      setError('');
+      setCurrentStep('url');
+      setSelectedCountry('US');
+      setSelectedProducts([]);
+      setSelectedTone('casual');
+      setWeekNumber(1);
+      setCopiedCaption(null);
+      setShowUpgradePrompt(false);
+      setShowFeedbackModal(false);
+      setGeneratingDay(1);
+      setIsResetting(false);
+      
+      // Clear any localStorage data if needed
+      // localStorage.removeItem('someKey'); // Add if you have persisted data
+    }, 800); // Brief loading for good UX
   }, []);
   
   // Check usage on component mount
@@ -159,6 +172,23 @@ export default function HomePage() {
 
     setLoading(true);
     setError('');
+    
+    // Start day progression for calendar generation only
+    if (currentStep === 'preferences') {
+      setGeneratingDay(1);
+      const dayInterval = setInterval(() => {
+        setGeneratingDay(prev => {
+          if (prev >= 7) {
+            clearInterval(dayInterval);
+            return 7;
+          }
+          return prev + 1;
+        });
+      }, 1000); // Change day every 1 second
+      
+      // Clear interval when loading finishes
+      setTimeout(() => clearInterval(dayInterval), 7000);
+    }
 
     try {
       const requestBody: Record<string, unknown> = {
@@ -239,6 +269,7 @@ export default function HomePage() {
       }
     } finally {
       setLoading(false);
+      setGeneratingDay(1); // Reset day counter
     }
   }, [url, selectedCountry, selectedTone, weekNumber, selectedProducts, getAuthHeaders, currentStep, dailyUsage]);
 
@@ -324,6 +355,15 @@ export default function HomePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
         <PageLoader text="Authenticating..." />
+      </div>
+    );
+  }
+
+  // Show loading screen while resetting
+  if (isResetting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900">
+        <PageLoader text="Resetting..." />
       </div>
     );
   }
@@ -467,7 +507,7 @@ export default function HomePage() {
                         </p>
                         
                         <div className="flex justify-center">
-                          <GoogleLoginButton />
+                          <GoogleLoginButton loading={loading} />
                         </div>
                         
                         <p className="text-xs sm:text-sm text-white/50 mt-6 sm:mt-8 px-4">
@@ -592,16 +632,29 @@ export default function HomePage() {
                       <div className="text-center pt-4 border-t border-white/10">
                         <Button
                           onClick={() => {
-                            setCurrentStep('url');
-                            setResult(null);
-                            setUrl('');
-                            setSelectedProducts([]);
-                            setWeekNumber(1);
+                            setLoading(true);
                             setError('');
+                            
+                            // Show brief loading then reset
+                            setTimeout(() => {
+                              setCurrentStep('url');
+                              setResult(null);
+                              setUrl('');
+                              setSelectedProducts([]);
+                              setWeekNumber(1);
+                              setError('');
+                              setGeneratingDay(1);
+                              setLoading(false);
+                            }, 500); // Brief 500ms loading
                           }}
-                          className="bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm"
+                          disabled={loading}
+                          className="bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          ← Create New Calendar
+                          {loading ? (
+                            <InlineLoader text="Resetting..." />
+                          ) : (
+                            <>← Create New Calendar</>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -635,7 +688,7 @@ export default function HomePage() {
                         {loading ? (
                           <InlineLoader 
                             text={currentStep === 'url' ? 'Loading products...' : 
-                                  currentStep === 'preferences' ? 'Generating calendar...' : 
+                                  currentStep === 'preferences' ? `Generating Day ${generatingDay}...` : 
                                   'Processing...'}
                           />
                         ) : (

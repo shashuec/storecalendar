@@ -9,7 +9,7 @@ interface GoogleLoginButtonProps {
 }
 
 export default function GoogleLoginButton({ loading = false, setLoading }: GoogleLoginButtonProps) {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const handleLogin = () => {
     if (setLoading) {
@@ -19,16 +19,21 @@ export default function GoogleLoginButton({ loading = false, setLoading }: Googl
     login();
   };
 
+  // Show loading during login or when transitioning after authentication
+  const isLoading = loading;
+
   return (
     <button
       onClick={handleLogin}
-      disabled={loading}
+      disabled={isLoading}
       className="flex items-center justify-center gap-3 px-6 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {loading ? (
+      {isLoading ? (
         <>
           <ButtonLoader size="small" />
-          <span className="text-gray-700 font-medium">Signing in...</span>
+          <span className="text-gray-700 font-medium">
+            {user ? 'Loading products...' : 'Signing in...'}
+          </span>
         </>
       ) : (
         <>

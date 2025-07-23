@@ -52,14 +52,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log successful feedback submission
-    console.log('Feedback submitted:', {
-      id: data.id,
-      liked_website,
-      has_suggestions: !!improvement_suggestions,
-      user_type: user_id ? 'authenticated' : 'anonymous',
-      timestamp: new Date().toISOString()
-    });
+    // // Log successful feedback submission
+    // console.log('Feedback submitted:', {
+    //   id: data.id,
+    //   liked_website,
+    //   has_suggestions: !!improvement_suggestions,
+    //   user_type: user_id ? 'authenticated' : 'anonymous',
+    //   timestamp: new Date().toISOString()
+    // });
 
     return NextResponse.json({
       success: true,
