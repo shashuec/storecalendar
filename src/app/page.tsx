@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, startTransition } fro
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { GenerationResponse, CountryCode, BrandTone } from '@/types';
+import { GenerationResponse, CountryCode, BrandTone, BusinessType, ServiceCategory, ServiceBusiness } from '@/types';
 import { CountrySelectorCompact } from '@/components/CountrySelector';
 import { ProductSelector } from '@/components/ProductSelector';
 import { BrandToneSelectorCompact } from '@/components/BrandToneSelector';
@@ -16,6 +16,27 @@ import GoogleLoginButton from '@/components/GoogleLoginButton';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { PageLoader, InlineLoader } from '@/components/Loader';
 import DemoVideo from '@/components/DemoVideo';
+import PreviousCalendars from '@/components/PreviousCalendars';
+import BusinessTypeSelector from '@/components/BusinessTypeSelector';
+// Removed unused imports: BusinessDetailsForm, ContentGoalsSelector - using auto-detection flow
+
+// Local interfaces for removed components
+interface BusinessDetails {
+  businessName: string;
+  location: string;
+  website: string;
+  services: string[];
+}
+
+interface ContentGoalsData {
+  contentGoals: string[];
+  brandVoice: BrandTone;
+  targetAudience: {
+    ageRange: string;
+    gender: string;
+    style: string;
+  };
+}
 
 export default function HomePage() {
   // Auth state
@@ -31,18 +52,25 @@ export default function HomePage() {
   const [error, setError] = useState('');
   
   // V1 form state - initialize based on auth state
-  const [currentStep, setCurrentStep] = useState<'url' | 'auth' | 'products' | 'preferences' | 'results'>('url');
+  const [currentStep, setCurrentStep] = useState<'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceTone'>('businessType');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>('US');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedTone, setSelectedTone] = useState<BrandTone>('casual');
   const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
   
+  // Business type flow state
+  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
+  const [serviceCategory, setServiceCategory] = useState<ServiceCategory | null>(null);
+  const [serviceUrl, setServiceUrl] = useState('');
+  // Removed businessDetails state - using auto-detection
+  const [serviceBusiness, setServiceBusiness] = useState<ServiceBusiness | null>(null);
+  
   // Copy state for calendar posts
-  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [, setCopiedCaption] = useState<string | null>(null);
   
   // Freemium usage tracking
   const [dailyUsage, setDailyUsage] = useState<number>(0);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [, setShowUpgradePrompt] = useState(false);
   
   // Feedback modal state
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -63,7 +91,7 @@ export default function HomePage() {
       setLoading(false);
       setResult(null);
       setError('');
-      setCurrentStep('url');
+      setCurrentStep('businessType');
       setSelectedCountry('US');
       setSelectedProducts([]);
       setSelectedTone('casual');
@@ -89,40 +117,29 @@ export default function HomePage() {
   // Initialize proper step based on auth state and persisted data
   useEffect(() => {
     if (isLoaded && !authLoading) {
-      if (user) {
-        // User is authenticated, restore their state
-        const persistedState = getPersistedState();
-        if (persistedState) {
-          // Batch all state updates to prevent multiple re-renders
-          startTransition(() => {
-            setCurrentStep(persistedState.currentStep);
-            setUrl(persistedState.url);
-            setSelectedProducts(persistedState.selectedProducts);
-            setSelectedCountry(persistedState.selectedCountry);
-            setSelectedTone(persistedState.selectedTone);
-            setWeekNumber(persistedState.weekNumber);
-            setResult(persistedState.result);
-          });
-        } else {
-          // Authenticated user but no saved state, start at URL step
-          setCurrentStep('url');
-        }
+      const persistedState = getPersistedState();
+      
+      if (persistedState && persistedState.currentStep) {
+        // Restore persisted state
+        startTransition(() => {
+          setCurrentStep(persistedState.currentStep);
+          setUrl(persistedState.url || '');
+          setSelectedProducts(persistedState.selectedProducts || []);
+          setSelectedCountry(persistedState.selectedCountry || 'US');
+          setSelectedTone(persistedState.selectedTone || 'casual');
+          setWeekNumber(persistedState.weekNumber || 1);
+          setResult(persistedState.result || null);
+          setBusinessType(persistedState.businessType || null);
+          setServiceCategory(persistedState.serviceCategory || null);
+          // businessDetails removed
+          setServiceBusiness(persistedState.serviceBusiness || null);
+        });
       } else {
-        // User not authenticated, check if they have entered a URL before
-        const persistedState = getPersistedState();
-        if (persistedState && persistedState.url) {
-          // User has a URL saved but not authenticated, go to auth step
-          startTransition(() => {
-            setUrl(persistedState.url);
-            setCurrentStep('auth');
-          });
-        } else {
-          // Fresh user, start at URL step
-          setCurrentStep('url');
-        }
+        // Fresh start - always begin with business type selection
+        setCurrentStep('businessType');
       }
     }
-  }, [isLoaded, authLoading, user]); // Removed getPersistedState to prevent dependency issues
+  }, [isLoaded, authLoading]); // Removed getPersistedState to prevent dependency issues
 
   // Debounced state persistence to prevent excessive localStorage writes
   const debouncedSaveState = useMemo(
@@ -147,9 +164,13 @@ export default function HomePage() {
         selectedTone,
         weekNumber,
         result,
+        businessType,
+        serviceCategory,
+        // businessDetails removed
+        serviceBusiness
       });
     }
-  }, [isLoaded, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, debouncedSaveState]);
+  }, [isLoaded, currentStep, url, selectedProducts, selectedCountry, selectedTone, weekNumber, result, businessType, serviceCategory, serviceBusiness, debouncedSaveState]);
 
   // Memoize enhanced products to prevent unnecessary recalculations
   const enhancedProducts = useMemo(() => result?.enhanced_products || [], [result?.enhanced_products]);
@@ -162,6 +183,161 @@ export default function HomePage() {
       setSelectedProducts(selectedIds);
     }
   }, [enhancedProducts, selectedProducts.length]);
+
+  // Handle service URL scraping and processing
+  const handleServiceUrlScraping = useCallback(async () => {
+    if (!serviceUrl.trim()) {
+      setError('Please enter a valid URL');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Use API to scrape the service business URL with auto-category detection
+      const scrapedData = await fetch('/api/scrape-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          url: serviceUrl
+        }),
+      });
+
+      const data = await scrapedData.json();
+
+      if (!scrapedData.ok) {
+        throw new Error(data.error || 'Failed to scrape business information');
+      }
+
+      // Create service business object from scraped data with auto-detected category
+      const detectedCategory = data.category || 'other';
+      setServiceCategory(detectedCategory); // Update state with detected category
+      
+      const serviceBiz: ServiceBusiness = {
+        businessName: data.businessName || 'Business',
+        category: detectedCategory,
+        location: data.location || 'Location',
+        website: serviceUrl,
+        businessUrl: serviceUrl, // Ensure businessUrl is set
+        services: data.services || [],
+        contentGoals: ['appointments', 'showcase', 'community'], // Default goals
+        brandVoice: selectedTone,
+        brandTone: selectedTone, // Alias for brandVoice
+        targetAudience: {
+          ageRange: '25-45',
+          gender: 'All',
+          style: data.targetAudience || 'General audience'
+        },
+        scrapedContent: data.scrapedContent // Include the scraped content
+      };
+
+      setServiceBusiness(serviceBiz);
+      
+      // Check if user is authenticated
+      if (!user) {
+        setCurrentStep('auth');
+      } else {
+        // Generate calendar directly
+        await handleGenerateServiceCalendar(serviceBiz);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, [serviceUrl, selectedTone, user, getAuthHeaders, weekNumber]);
+
+  // Handle service business calendar generation
+  const handleGenerateServiceCalendar = useCallback(async (serviceBiz: ServiceBusiness) => {
+    setLoading(true);
+    setError('');
+    
+    // Start day progression for calendar generation
+    setGeneratingDay(1);
+    const dayInterval = setInterval(() => {
+      setGeneratingDay(prev => {
+        if (prev >= 7) {
+          clearInterval(dayInterval);
+          return 7;
+        }
+        return prev + 1;
+      });
+    }, 1000); // Change day every 1 second
+    
+    // Clear interval when loading finishes
+    setTimeout(() => clearInterval(dayInterval), 7000);
+
+    try {
+      const response = await fetch('/api/generate-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          serviceBusiness: serviceBiz,
+          weekNumber: weekNumber
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate service calendar');
+      }
+
+      if (data.success) {
+        // Transform the response to match the result format
+        setResult({
+          success: true,
+          store_name: data.business_name,
+          weekly_calendar: data.weekly_calendar,
+          upcoming_holidays: data.upcoming_holidays,
+          calendar_id: data.calendar_id,
+          message: data.message
+        } as GenerationResponse);
+        
+        // Track usage for freemium model (service businesses)
+        const today = new Date().toDateString();
+        const newUsage = dailyUsage + 1;
+        setDailyUsage(newUsage);
+        localStorage.setItem(`usage_${today}`, newUsage.toString());
+        
+        if (newUsage >= 3) {
+          setShowUpgradePrompt(true);
+        }
+        
+        setCurrentStep('results');
+        
+        // Show feedback modal after calendar is generated
+        setTimeout(() => {
+          setShowFeedbackModal(true);
+        }, 7000); // Wait 7 seconds for user to see the feedback
+      } else {
+        setError(data.error || 'Failed to generate content');
+      }
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      
+      // Provide more helpful error messages for common issues
+      if (errorMessage.includes('429') || errorMessage.includes('quota')) {
+        setError('Service temporarily unavailable due to high demand. Please try again in a few minutes.');
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+      setGeneratingDay(1); // Reset day counter
+    }
+  }, [weekNumber, getAuthHeaders]);
 
   // Define handleGenerate before using it in effects
   const handleGenerate = useCallback(async (withEmail = false, forceRefresh = false) => {
@@ -249,7 +425,7 @@ export default function HomePage() {
           // Show feedback modal after calendar is generated
           setTimeout(() => {
             setShowFeedbackModal(true);
-          }, 2000); // Wait 2 seconds for user to see the results
+          }, 7000); // Wait 7 seconds for user to see the feedback
         }
 
       } else {
@@ -273,23 +449,46 @@ export default function HomePage() {
     }
   }, [url, selectedCountry, selectedTone, weekNumber, selectedProducts, getAuthHeaders, currentStep, dailyUsage]);
 
-  // Auto-proceed from auth step once user logs in
+  // Auto-proceed from auth step once user logs in based on business type
   useEffect(() => {
-    if (currentStep === 'auth' && user && url.trim() && !loading) {
-      // User just logged in and we have a URL, and we're not already loading
-      if (result?.enhanced_products) {
-        // Products already loaded, skip directly to product selection
-        setCurrentStep('products');
-      } else {
-        // Need to load products first, then will auto-navigate to products step
-        handleGenerate();
+    if (currentStep === 'auth' && user && !loading && businessType) {
+      // Check if we came from service flow
+      if (serviceBusiness) {
+        // User just logged in from service flow, generate calendar
+        handleGenerateServiceCalendar(serviceBusiness);
+      } else if (businessType === 'product') {
+        // User just logged in from product flow
+        if (url.trim() && result?.enhanced_products) {
+          // Products already loaded, skip directly to product selection
+          setCurrentStep('products');
+        } else {
+          // Go to URL input step for product businesses
+          setCurrentStep('url');
+        }
+      } else if (businessType === 'service') {
+        // Go directly to service URL input for service businesses
+        setCurrentStep('serviceUrl');
       }
     }
-  }, [currentStep, user, url, result?.enhanced_products, loading, handleGenerate]);
+  }, [currentStep, user, loading, businessType, url, result?.enhanced_products, serviceBusiness, handleGenerateServiceCalendar]);
 
   // Memoized step navigation functions to prevent unnecessary re-renders
   const handleNextStep = useCallback(() => {
-    if (currentStep === 'url') {
+    setError('');
+    
+    // Handle service business flow
+    if (currentStep === 'serviceUrl') {
+      if (!serviceUrl.trim()) {
+        setError('Please enter a business URL');
+        return;
+      }
+      setCurrentStep('serviceTone');
+    } else if (currentStep === 'serviceTone') {
+      // Process the URL and generate calendar
+      handleServiceUrlScraping();
+    // businessDetails step removed
+      return;
+    } else if (currentStep === 'url') {
       if (!url.trim()) {
         setError('Please enter a Shopify store URL');
         return;
@@ -310,26 +509,42 @@ export default function HomePage() {
       // Generate the final calendar
       handleGenerate();
     }
-    setError('');
-  }, [currentStep, url, user, selectedProducts.length, handleGenerate]);
+  }, [currentStep, url, user, selectedProducts.length, handleGenerate, serviceUrl, handleServiceUrlScraping]);
 
   const handlePrevStep = useCallback(() => {
-    if (currentStep === 'auth') setCurrentStep('url');
-    else if (currentStep === 'products') {
+    setError('');
+    
+    // Handle business type flow navigation
+    if (currentStep === 'url' && user) {
+      // Going back from product URL to auth
+      setCurrentStep('businessType');
+    } else if (currentStep === 'auth') {
+      // No back navigation allowed from auth step
+      return;
+    } else if ((currentStep === 'url' || currentStep === 'serviceUrl') && !user){
+      setCurrentStep('auth')
+    }
+    else if (currentStep === 'serviceUrl' && user) {
+      setCurrentStep('businessType');
+    } else if (currentStep === 'serviceTone') {
+      setCurrentStep('serviceUrl');
+    // businessDetails and contentGoals steps removed
+    } else if (currentStep === 'products') {
       // Clear selected products and results when going back from product selection
       setSelectedProducts([]);
-      setResult(null); // Clear previous results to prevent ID conflicts with new URL
-      // If user is logged in, skip auth and go back to URL
-      setCurrentStep(user ? 'url' : 'auth');
-    }
-    else if (currentStep === 'preferences') {
-      // Clear selected products when going back to product selection
-      setSelectedProducts([]);
+      setResult(null);
+      setCurrentStep('url');
+    } else if (currentStep === 'preferences') {
       setCurrentStep('products');
+    } else if (currentStep === 'results') {
+      // Going back from results - depends on business type
+      if (businessType === 'service') {
+        setCurrentStep('serviceTone');
+      } else {
+        setCurrentStep('preferences');
+      }
     }
-    else if (currentStep === 'results') setCurrentStep('preferences');
-    setError('');
-  }, [currentStep, user]);
+  }, [currentStep, businessType, serviceBusiness]);
 
   const handleGenerateWeek2 = useCallback(() => {
     setWeekNumber(2);
@@ -344,9 +559,14 @@ export default function HomePage() {
     setResult(null);
     setUrl('');
     setError('');
-    setCurrentStep('url');
+    setCurrentStep('businessType');
     setSelectedProducts([]);
     setCopiedCaption(null);
+    // Reset business type flow state
+    setBusinessType(null);
+    setServiceCategory(null);
+    // setBusinessDetails removed
+    setServiceBusiness(null);
     clearState(); // Clear persisted state
   };
 
@@ -429,11 +649,11 @@ export default function HomePage() {
       <section className="relative px-4 lg:px-6 py-16 sm:py-24 lg:py-32">
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-white mb-6 sm:mb-8 leading-tight">
-            E-commerce Content 
-            <span className="block sm:inline bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Automation Platform</span>
+            Social Media Content 
+            <span className="block sm:inline bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent"> Automation for All Businesses</span>
           </h1>
           <p className="text-lg sm:text-xl text-white/70 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-4">
-            Create a week&apos;s worth of strategic posts in 60 seconds. Starting with Shopify, expanding to all e-commerce platforms. Holiday-aware content that connects with your audience.
+            Create a week&apos;s worth of strategic posts in 60 seconds. Perfect for e-commerce stores, salons, gyms, restaurants, and all service businesses. Holiday-aware content that connects with your audience.
           </p>
          
               
@@ -444,18 +664,37 @@ export default function HomePage() {
                   
                   {/* Step Indicator */}
                   <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-6 sm:mb-8 overflow-hidden">
-                    {[
-                      { key: 'url', label: 'Store URL' },
-                      { key: 'products', label: 'Products' },
-                      { key: 'preferences', label: 'Preferences' },
-                      { key: 'results', label: 'Calendar' }
-                    ].map((stepInfo, index) => (
+                    {(() => {
+                      // Dynamic steps based on business type
+                      let steps = [];
+                      if (businessType === 'product') {
+                        steps = [
+                          { key: 'businessType', label: 'Business Type' },
+                          { key: 'url', label: 'Store URL' },
+                          { key: 'products', label: 'Products' },
+                          { key: 'preferences', label: 'Preferences' },
+                          { key: 'results', label: 'Calendar' }
+                        ];
+                      } else if (businessType === 'service') {
+                        steps = [
+                          { key: 'businessType', label: 'Business Type' },
+                          { key: 'serviceUrl', label: 'URL' },
+                          { key: 'serviceTone', label: 'Brand Voice' },
+                          { key: 'results', label: 'Calendar' }
+                        ];
+                      } else {
+                        steps = [
+                          { key: 'businessType', label: 'Business Type' }
+                        ];
+                      }
+                      
+                      return steps.map((stepInfo, index) => (
                       <div key={stepInfo.key} className="flex items-center flex-shrink-0">
                         <div className="flex flex-col items-center">
                           <div className={`w-5 h-5 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium ${
                             currentStep === stepInfo.key 
                               ? 'bg-blue-500 text-white' 
-                              : index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
+                              : index < steps.findIndex(s => s.key === currentStep)
                                 ? 'bg-green-500 text-white'
                                 : 'bg-white/20 text-white/60'
                           }`}>
@@ -463,18 +702,82 @@ export default function HomePage() {
                           </div>
                           <div className="text-[8px] sm:text-xs text-white/70 mt-1 text-center whitespace-nowrap">{stepInfo.label}</div>
                         </div>
-                        {index < 3 && (
+                        {index < steps.length - 1 && (
                           <div className={`w-4 sm:w-8 h-0.5 mx-1 sm:mx-2 ${
-                            index < ['url', 'products', 'preferences', 'results'].indexOf(currentStep)
+                            index < steps.findIndex(s => s.key === currentStep)
                               ? 'bg-green-500'
                               : 'bg-white/20'
                           }`} />
                         )}
                       </div>
-                    ))}
+                    ));
+                    })()}
                   </div>
 
-                  {/* Step 1: URL Input */}
+                  {/* Step 0: Business Type Selection */}
+                  {currentStep === 'businessType' && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <BusinessTypeSelector
+                        onSelect={(type) => {
+                          setBusinessType(type);
+                          // Always go to auth after business type selection
+                          setCurrentStep('auth');
+                        }}
+                        disabled={loading}
+                        onShowFeedback={() => setShowFeedbackModal(true)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Step 1: Service URL Input */}
+                  {currentStep === 'serviceUrl' && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-3">
+                          Enter Your Business URL
+                        </h2>
+                        <p className="text-white/70 text-sm sm:text-base text-center mb-8">
+                          We&apos;ll auto-detect your service category and extract business details
+                        </p>
+                        
+                        <label htmlFor="serviceUrl" className="block text-sm font-medium text-white/90 mb-3">
+                          Your Business Website or Social Media URL
+                        </label>
+                        <Input
+                          id="serviceUrl"
+                          type="url"
+                          placeholder="e.g., mybusiness.com or instagram.com/mybusiness"
+                          value={serviceUrl}
+                          onChange={(e) => setServiceUrl(e.target.value)}
+                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
+                          disabled={loading}
+                        />
+                        <p className="text-white/50 text-xs mt-2">
+                          Supports: Website, Instagram, Facebook, Google Business Profile
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Service Tone Selection */}
+                  {currentStep === 'serviceTone' && (
+                    <div className="space-y-4 sm:space-y-6">
+                      <div className="text-center mb-4">
+                        <h3 className="text-base sm:text-lg font-medium text-white mb-2">Select Your Brand Voice</h3>
+                        <p className="text-xs sm:text-sm text-white/70 px-4">Choose how you want to communicate with your audience</p>                        
+                      </div>
+                      
+                      <BrandToneSelectorCompact
+                        selectedTone={selectedTone}
+                        onToneChange={setSelectedTone}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+
+                  {/* Business Details and Content Goals steps removed - using auto-detection from URL */}
+
+                  {/* Step 1: URL Input (Product Flow) */}
                   {currentStep === 'url' && (
                     <div className="space-y-4 sm:space-y-6">
                       <div>
@@ -503,7 +806,10 @@ export default function HomePage() {
                           Sign in to continue
                         </h3>
                         <p className="text-white/70 mb-2 text-sm sm:text-base">
-                          Create your weekly content calendar with AI
+                          {businessType === 'service' 
+                            ? `Create a content calendar for your ${serviceCategory?.replace('_', ' ') || 'service business'}`
+                            : 'Create your weekly content calendar with AI'
+                          }
                         </p>
                         
                         <div className="flex justify-center">
@@ -513,15 +819,6 @@ export default function HomePage() {
                         <p className="text-xs sm:text-sm text-white/50 mt-6 sm:mt-8 px-4">
                           By signing in, you agree to our Terms of Service and Privacy Policy
                         </p>
-                        
-                        {/* <div className="mt-4 sm:mt-6">
-                          <Button
-                            onClick={handlePrevStep}
-                            className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base"
-                          >
-                            ← Back to URL
-                          </Button>
-                        </div> */}
                       </div>
                     </div>
                   )}
@@ -590,22 +887,10 @@ export default function HomePage() {
                             setCopiedCaption(post.id);
                             setTimeout(() => setCopiedCaption(null), 2000);
                           }}
+                          onShowFeedback={() => setShowFeedbackModal(true)}
                         />
                       </div>
                       
-                      {/* Generate Next Week Button
-                        {weekNumber === 1 && (
-                          <div className="flex-1">
-                            <Button
-                              onClick={handleGenerateWeek2}
-                              disabled={loading}
-                              className="w-full bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold py-2.5 sm:py-3 px-6 sm:px-8 rounded-xl shadow-lg transform hover:scale-105 transition-all duration-300 text-sm sm:text-base"
-                            >
-                              {loading ? 'Generating...' : 'Generate Next Week →'}
-                            </Button>
-                          </div>
-                        )}
-                      */}
 
                       {/* Success Tips */}
                       <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl border border-blue-500/20 p-4 sm:p-6">
@@ -637,7 +922,7 @@ export default function HomePage() {
                             
                             // Show brief loading then reset
                             setTimeout(() => {
-                              setCurrentStep('url');
+                              setCurrentStep('businessType');
                               setResult(null);
                               setUrl('');
                               setSelectedProducts([]);
@@ -645,6 +930,11 @@ export default function HomePage() {
                               setError('');
                               setGeneratingDay(1);
                               setLoading(false);
+                              // Reset business type flow state
+                              setBusinessType(null);
+                              setServiceCategory(null);
+                              // setBusinessDetails removed
+                              setServiceBusiness(null);
                             }, 500); // Brief 500ms loading
                           }}
                           disabled={loading}
@@ -663,14 +953,25 @@ export default function HomePage() {
                   {/* Error Display */}
                   {error && (
                     <div className="text-red-300 text-xs sm:text-sm bg-red-500/20 backdrop-blur-sm p-3 sm:p-4 rounded-xl border border-red-500/30 mx-2 sm:mx-0">
-                      {error}
+                      <div className="flex flex-col gap-3">
+                        <span>{error}</span>
+                        <button
+                          onClick={() => setShowFeedbackModal(true)}
+                          className="self-start px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.13 8.13 0 01-2.859-.515l-5.433 1.378a1 1 0 01-1.24-1.24l1.378-5.433A8.13 8.13 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                          </svg>
+                          Report Issue
+                        </button>
+                      </div>
                     </div>
                   )}
 
-                  {/* Navigation Buttons */}
+                  {/* Navigation Buttons - Hide for steps with their own submit buttons */}
                   {currentStep !== 'results' && currentStep !== 'auth' && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 pt-4 sm:pt-6">
-                      {currentStep !== 'url' ? (
+                      {currentStep !== 'businessType' ? (
                         <Button
                           onClick={handlePrevStep}
                           disabled={loading}
@@ -688,15 +989,19 @@ export default function HomePage() {
                         {loading ? (
                           <InlineLoader 
                             text={currentStep === 'url' ? 'Loading products...' : 
-                                  currentStep === 'preferences' ? `Generating Day ${generatingDay}...` : 
+                                  currentStep === 'preferences' ? `Generating Day ${generatingDay}...` :
+                                  currentStep === 'serviceTone' ? 'Analyzing business...' :
                                   'Processing...'}
                           />
                         ) : (
                           <>
-                            {currentStep === 'url' ? 'Load Products' :
+                            {currentStep === 'businessType' ? 'Continue' :
+                             currentStep === 'serviceUrl' ? 'Continue' :
+                             currentStep === 'serviceTone' ? 'Generate Calendar' :
+                             currentStep === 'url' ? 'Load Products' :
                              currentStep === 'products' ? 'Set Preferences' :
                              currentStep === 'preferences' ? 'Generate Calendar' : 'Next'}
-                            {currentStep !== 'preferences' && ' →'}
+                            {currentStep !== 'preferences' && currentStep !== 'serviceTone' && ' →'}
                           </>
                         )}
                       </Button>
@@ -705,6 +1010,11 @@ export default function HomePage() {
 
                 </div>
               </div>
+
+              {/* Previous Calendars Section - Only show for authenticated users */}
+              {user && (
+                <PreviousCalendars className="max-w-6xl mx-auto mb-8 sm:mb-16" />
+              )}
 
               {/* Demo Video Section */}
               <DemoVideo className="max-w-6xl mx-auto mb-8 sm:mb-16" />

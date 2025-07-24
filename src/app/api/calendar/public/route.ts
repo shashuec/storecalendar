@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get public calendar data directly from tables (fallback if view doesn't exist)
+    // Get public calendar data supporting both product and service businesses
     const { data: calendar, error: fetchError } = await supabase
       .from('calendar_weekly_calendars')
       .select(`
@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
         brand_tone,
         calendar_data,
         shared_at,
-        calendar_stores!inner(store_name)
+        business_type,
+        calendar_stores(store_name),
+        calendar_service_businesses(business_name)
       `)
       .eq('share_token', shareToken)
       .eq('is_public', true)
@@ -60,6 +62,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Get business name based on business type
+    const businessName = calendar.business_type === 'service' 
+      ? (calendar.calendar_service_businesses as { business_name?: string })?.business_name
+      : (calendar.calendar_stores as { store_name?: string })?.store_name;
+
     // Return public calendar data
     return NextResponse.json({
       success: true,
@@ -67,7 +74,8 @@ export async function GET(request: NextRequest) {
         shareToken: calendar.share_token,
         title: calendar.share_title,
         description: calendar.share_description,
-        storeName: (calendar.calendar_stores as { store_name?: string })?.store_name,
+        storeName: businessName || 'Business', // Keep field name for backward compatibility
+        businessType: calendar.business_type,
         weekNumber: calendar.week_number,
         startDate: calendar.start_date,
         endDate: calendar.end_date,
@@ -100,7 +108,7 @@ export async function HEAD(request: NextRequest) {
     // Get basic calendar info for meta tags
     const { data: calendar, error: fetchError } = await supabase
       .from('calendar_weekly_calendars')
-      .select('share_title, share_description, shared_at, calendar_stores!inner(store_name)')
+      .select('share_title, share_description, shared_at, business_type, calendar_stores(store_name), calendar_service_businesses(business_name)')
       .eq('share_token', shareToken)
       .eq('is_public', true)
       .single();
@@ -109,13 +117,18 @@ export async function HEAD(request: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
 
+    // Get business name based on business type
+    const businessName = calendar.business_type === 'service' 
+      ? (calendar.calendar_service_businesses as { business_name?: string })?.business_name
+      : (calendar.calendar_stores as { store_name?: string })?.store_name;
+
     // Return success with metadata in headers
     return new NextResponse(null, {
       status: 200,
       headers: {
         'X-Calendar-Title': calendar.share_title || 'Weekly Social Media Calendar',
         'X-Calendar-Description': calendar.share_description || 'AI-generated content calendar',
-        'X-Store-Name': (calendar.calendar_stores as { store_name?: string })?.store_name || 'Store',
+        'X-Store-Name': businessName || 'Business',
         'X-Shared-At': calendar.shared_at || new Date().toISOString(),
       }
     });

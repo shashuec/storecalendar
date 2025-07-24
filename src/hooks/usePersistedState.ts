@@ -1,14 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GenerationResponse, CountryCode, BrandTone } from '@/types';
+import { GenerationResponse, CountryCode, BrandTone, BusinessType, ServiceCategory, ServiceBusiness } from '@/types';
+// BusinessDetails interface moved to page.tsx - no longer using separate component
+interface BusinessDetails {
+  businessName: string;
+  location: string;
+  website: string;
+  services: string[];
+}
 
 export interface PersistedState {
-  currentStep: 'url' | 'auth' | 'products' | 'preferences' | 'results';
+  currentStep: 'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceTone';
   url: string;
   selectedProducts: string[];
   selectedCountry: CountryCode;
   selectedTone: BrandTone;
   weekNumber: 1 | 2;
   result: GenerationResponse | null;
+  businessType?: BusinessType | null;
+  serviceCategory?: ServiceCategory | null;
+  businessDetails?: BusinessDetails | null;
+  serviceBusiness?: ServiceBusiness | null;
   lastUpdated: string;
 }
 
@@ -57,13 +68,17 @@ export function usePersistedState() {
     try {
       const currentState = getPersistedState();
       const newState: PersistedState = {
-        currentStep: 'url',
+        currentStep: 'businessType',
         url: '',
         selectedProducts: [],
         selectedCountry: 'US',
         selectedTone: 'casual',
         weekNumber: 1,
         result: null,
+        businessType: null,
+        serviceCategory: null,
+        businessDetails: null,
+        serviceBusiness: null,
         lastUpdated: new Date().toISOString(),
         ...currentState,
         ...state,

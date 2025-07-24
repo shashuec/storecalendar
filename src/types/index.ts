@@ -70,7 +70,8 @@ export interface CalendarPost {
   date: string; // YYYY-MM-DD
   post_type: string; // Product Showcase, Testimonial, etc.
   caption_text: string;
-  product_featured: ShopifyProduct;
+  product_featured?: ShopifyProduct;
+  service_featured?: string; // Service name for service businesses
   holiday_context?: Holiday;
 }
 
@@ -111,6 +112,117 @@ export interface GenerationResponse {
   upcoming_holidays?: Holiday[];
   enhanced_products?: ShopifyProductEnhanced[];
   calendar_id?: string; // For sharing functionality
+}
+
+// Business Type definitions
+export type BusinessType = 'product' | 'service';
+
+export type ServiceCategory = 
+  | 'salon_spa' 
+  | 'gym_fitness' 
+  | 'food_dining' 
+  | 'health_medical' 
+  | 'professional_services' 
+  | 'other';
+
+// Service offerings by category
+export const SERVICE_OFFERINGS = {
+  salon_spa: [
+    'Hair Cutting & Styling',
+    'Hair Coloring',
+    'Hair Treatments',
+    'Nails',
+    'Makeup',
+    'Facial Treatments',
+    'Waxing',
+    'Massage',
+    'Eyebrows & Lashes',
+    'Body Treatments',
+    'Bridal Services',
+    'Men\'s Grooming'
+  ],
+  gym_fitness: [
+    'Personal Training',
+    'Group Classes',
+    'Yoga',
+    'Pilates',
+    'CrossFit',
+    'Cardio Equipment',
+    'Weight Training',
+    'Swimming Pool',
+    'Nutrition Coaching',
+    'Sports Training',
+    'Rehabilitation',
+    'Kids Programs'
+  ],
+  food_dining: [
+    'Dine-in',
+    'Takeout',
+    'Delivery',
+    'Catering',
+    'Private Events',
+    'Bar Service',
+    'Breakfast',
+    'Lunch',
+    'Dinner',
+    'Brunch',
+    'Happy Hour',
+    'Special Diets'
+  ],
+  health_medical: [
+    'General Practice',
+    'Specialist Care',
+    'Dental Services',
+    'Physical Therapy',
+    'Mental Health',
+    'Pediatrics',
+    'Diagnostics',
+    'Preventive Care',
+    'Telemedicine',
+    'Emergency Care',
+    'Pharmacy',
+    'Alternative Medicine'
+  ],
+  professional_services: [
+    'Consulting',
+    'Legal Services',
+    'Accounting',
+    'Marketing',
+    'IT Services',
+    'Real Estate',
+    'Insurance',
+    'Financial Planning',
+    'Business Strategy',
+    'HR Services',
+    'Design Services',
+    'Education & Training'
+  ],
+  other: [
+    'Custom Service 1',
+    'Custom Service 2',
+    'Custom Service 3',
+    'Custom Service 4'
+  ]
+};
+
+export interface ServiceBusiness {
+  businessName: string;
+  location: string;
+  website?: string;
+  businessUrl?: string; // For database compatibility
+  category: ServiceCategory;
+  services: string[];
+  businessHours?: string;
+  contactInfo?: string;
+  contentGoals: string[];
+  brandVoice: BrandTone;
+  brandTone?: BrandTone; // Alias for brandVoice
+  targetAudience: {
+    ageRange: string;
+    gender: string;
+    style: string;
+  };
+  scrapedContent?: string; // Raw scraped content
 }
 
 // User authentication types

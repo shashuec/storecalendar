@@ -13,6 +13,7 @@ interface WeeklyCalendarProps {
   className?: string;
   calendarId?: string;
   storeName?: string;
+  onShowFeedback?: () => void;
 }
 
 
@@ -21,7 +22,8 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
   onCopyPost, 
   className = '',
   calendarId,
-  storeName
+  storeName,
+  onShowFeedback
 }: WeeklyCalendarProps) {
   const [copiedPost, setCopiedPost] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
@@ -163,12 +165,24 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
             )}
 
             {/* Caption */}
-            <div className="mb-3 sm:mb-4 flex-1">
+            <div className="mb-3 sm:mb-4 flex-1 relative group">
               <p className="text-white/90 text-xs sm:text-sm leading-relaxed break-words overflow-hidden">
                 {post.caption_text.length > 150 
                   ? `${post.caption_text.substring(0, 150)}...` 
                   : post.caption_text}
               </p>
+              
+              {/* Tooltip for full caption on hover - only show if caption is truncated */}
+              {post.caption_text.length > 150 && (
+                <div className="absolute z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 
+                              bg-slate-900 text-white p-4 rounded-lg shadow-xl border border-white/20 
+                              left-0 right-0 bottom-full mb-2 max-h-64 overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap">{post.caption_text}</p>
+                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
+                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-slate-900"></div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Product Info */}
@@ -268,6 +282,18 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
                     Share Calendar
                   </>
                 )}
+              </button>
+            )}
+
+            {onShowFeedback && (
+              <button 
+                onClick={onShowFeedback}
+                className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.13 8.13 0 01-2.859-.515l-5.433 1.378a1 1 0 01-1.24-1.24l1.378-5.433A8.13 8.13 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+                </svg>
+                Feedback
               </button>
             )}
           </div>

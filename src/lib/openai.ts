@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { ShopifyProduct, CaptionStyle, BrandTone, CountryCode } from '@/types';
+import { ShopifyProduct, CaptionStyle, BrandTone, CountryCode, ServiceBusiness, Holiday } from '@/types';
 import { supabase } from './supabase';
 import { getBrandTonePrompt } from './brand-tones';
 import { getUpcomingHolidays } from './holidays';
@@ -268,4 +268,140 @@ export async function generateAllCaptions(
   // Generate ALL 7 caption styles for ALL selected products
   const allStyles: CaptionStyle[] = Object.keys(CAPTION_STYLES) as CaptionStyle[];
   return generateCaptions(products, storeName, allStyles, storeId, brandTone, country); // Process ALL selected products
+}
+
+// Generate caption for service business
+export async function generateServiceCaption(
+  business: ServiceBusiness & { usedServices?: string[]; selectedService?: string },
+  postType: string,
+  dayName: string,
+  holiday?: Holiday
+): Promise<string> {
+  const openai = getOpenAIClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
+  
+  try {
+    // Get brand tone guidance
+    const brandToneGuidance = getBrandTonePrompt(business.brandVoice);
+    
+    // Build holiday context
+    let holidayContext = '';
+    if (holiday) {
+      holidayContext = `\n\n🎯 HOLIDAY CONTEXT:
+${holiday.name} (${holiday.date}) - Type: ${holiday.type}
+Incorporate this holiday naturally into the post. Make it relevant to the service business.`;
+    }
+    
+    // Build content goals context
+    const goalsContext = business.contentGoals.map(goal => {
+      const goalMap: { [key: string]: string } = {
+        'appointments': 'Drive appointments and bookings',
+        'showcase': 'Showcase transformations and results',
+        'community': 'Build local community connection',
+        'offers': 'Promote special offers and deals',
+        'expertise': 'Share expertise and professional tips',
+        'newservices': 'Announce new services',
+        'seasonal': 'Seasonal promotions',
+        'testimonials': 'Share client testimonials'
+      };
+      return goalMap[goal] || goal;
+    }).join(', ');
+    
+    // Build services context - aggressively shuffle and select specific service for this day
+    const shuffledServices = [...business.services].sort(() => 0.5 - Math.random());
+    const availableServices = business.usedServices && business.usedServices.length > 0 
+      ? shuffledServices.filter(service => !business.usedServices!.includes(service))
+      : shuffledServices;
+    
+    // Use the pre-selected service from the calling function, or fall back to selection logic
+    const selectedService = business.selectedService || (availableServices.length > 0 ? availableServices[0] : shuffledServices[0]);
+    
+    const usedServicesContext = business.usedServices && business.usedServices.length > 0 ? 
+      `\n\n⚠️ SERVICES ALREADY USED: ${business.usedServices.join(', ')}` : '';
+    
+    const serviceVarietyNote = business.services.length > 1 ? 
+      `\n\n🎯 MANDATORY SERVICE FOR THIS POST:
+- YOU MUST feature this specific service: "${selectedService}"
+- DO NOT mention any other services in the caption
+- Focus the entire caption around: "${selectedService}"
+- Make "${selectedService}" the hero of this ${postType} post${usedServicesContext}` : '';
+    
+    const prompt = `
+You are a social media expert creating content for "${business.businessName}", a ${business.category.replace('_', ' ')} business.
+
+${brandToneGuidance}
+
+BUSINESS DETAILS:
+- Category: ${business.category.replace('_', ' ')}
+- Location: ${business.location}
+- FEATURED SERVICE FOR THIS POST: ${selectedService}
+- Target Audience: ${business.targetAudience.ageRange} age group, ${business.targetAudience.gender}, ${business.targetAudience.style}
+- Content Goals: ${goalsContext}${holidayContext}${serviceVarietyNote}
+
+Create a ${postType} post for ${dayName}.
+
+CRITICAL REQUIREMENTS:
+1. 🎯 MANDATORY: Feature ONLY "${selectedService}" in this caption
+2. 🚫 FORBIDDEN: Do not mention any other services except "${selectedService}"
+3. Create the entire ${postType} post around "${selectedService}" specifically
+4. Keep caption 150-280 characters (Instagram/Facebook optimized)
+5. Include 2-3 hashtags specifically related to "${selectedService}"
+6. Include location: 📍 ${business.location}
+7. End with clear call-to-action about "${selectedService}" (Book ${selectedService}, Try ${selectedService}, etc.)
+8. Make it authentic to ${business.category.replace('_', ' ')} business
+9. If holiday context provided, incorporate naturally with "${selectedService}"
+10. Match the ${business.brandVoice} brand voice exactly
+
+CAPTION FOCUS: Make "${selectedService}" the hero of this post. Every sentence should relate to "${selectedService}".
+
+Return ONLY the caption text, nothing else.`;
+
+    const completion = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert social media content creator for service businesses. Create engaging, authentic posts that drive customer action.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.8,
+      max_tokens: 200,
+    });
+    
+    const captionText = completion.choices[0]?.message?.content?.trim();
+    
+    if (captionText) {
+      // Add business website if available
+      const websiteLink = business.website ? `\n\n🔗 ${business.website}` : '';
+      return `${captionText}${websiteLink}`;
+    }
+    
+    throw new Error('No caption generated');
+    
+  } catch (error) {
+    console.error('Error generating service caption:', error);
+    // Return a fallback caption
+    return createServiceFallback(business, postType, dayName, holiday);
+  }
+}
+
+// Fallback caption for service businesses
+function createServiceFallback(
+  business: ServiceBusiness,
+  postType: string,
+  dayName: string,
+  holiday?: Holiday
+): string {
+  const holidayMention = holiday ? ` Perfect timing for ${holiday.name}!` : '';
+  const services = business.services.slice(0, 2).join(' & ');
+  
+  const baseCaption = `🌟 ${postType} at ${business.businessName}!${holidayMention} Experience our amazing ${services} services. Your satisfaction is our priority!`;
+  const location = `\n\n📍 ${business.location}`;
+  const cta = business.website ? `\n🔗 Book now: ${business.website}` : '\n📞 Call us to book!';
+  
+  return `${baseCaption}${location}${cta} #${business.category.replace('_', '')} #LocalBusiness`;
 }
