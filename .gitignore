@@ -50,3 +50,5 @@ plan.txt
 !docs/*.md
 !README.md
 !CLAUDE.md
+
+check-deployments.js

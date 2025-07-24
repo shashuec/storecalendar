@@ -334,8 +334,8 @@ export function exportCalendarToCSV(calendar: WeeklyCalendar): string {
     post.date,
     post.post_type,
     `"${post.caption_text.replace(/"/g, '""')}"`, // Escape quotes
-    post.product_featured.name,
-    post.product_featured.price,
+    post.product_featured?.name || post.service_featured || '',
+    post.product_featured?.price || '',
     post.holiday_context?.name || '',
     getOptimalPostingTime(post.day)
   ]);

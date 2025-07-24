@@ -54,17 +54,17 @@ export const ProductSelector = memo(function ProductSelector({
 
   // Auto-select first 5 products from mapped list, ignoring parent selections
   useEffect(() => {
-    if (products.length > 0 && selectedProducts.length === 0) {
+    if (products.length > 0) {
       // Always select the first 5 products from the displayed list, regardless of parent selections
       const autoSelectIds = productsToDisplay
         .slice(0, Math.min(5, maxSelection))
         .map(product => product.id);
       
-      if (autoSelectIds.length > 0) {
+      if (autoSelectIds.length > 0 && autoSelectIds.join(',') !== selectedProducts.join(',')) {
         onSelectionChange(autoSelectIds);
       }
     }
-  }, [products, productsToDisplay, selectedProducts, maxSelection, onSelectionChange]);
+  }, [products.length]); // Only depend on products.length to run once when products are loaded
 
   const handleProductToggle = useCallback((productId: string) => {
     if (disabled) return;

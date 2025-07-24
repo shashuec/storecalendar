@@ -488,7 +488,7 @@ export async function POST(request: NextRequest) {
             const postsToInsert = weeklyCalendar.posts.map((post: CalendarPost) => ({
               calendar_id: calendarData.id,
               store_id: storeData.id,
-              product_id: productData?.find(p => p.shopify_product_id === post.product_featured.id)?.id,
+              product_id: post.product_featured ? productData?.find(p => p.shopify_product_id === post.product_featured!.id)?.id : null,
               day_name: post.day,
               post_date: post.date,
               post_type: post.post_type,
