@@ -32,6 +32,7 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
     publicUrl: string;
   } | null>(null);
   const [shareError, setShareError] = useState('');
+  const [expandedCaptions, setExpandedCaptions] = useState<Set<string>>(new Set());
   const { getAuthHeaders } = useAuth();
 
   const handleExportCSV = useCallback(() => {
@@ -109,15 +110,23 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
     }
   };
 
-  const handlePostClick = useCallback((post: CalendarPost, event: React.MouseEvent) => {
-    // Don't open product if clicking on copy button
-    if ((event.target as HTMLElement).closest('button')) {
-      return;
-    }
-    
-    // Open product URL in new window if available
-    if (post.product_featured?.url) {
-      window.open(post.product_featured.url, '_blank', 'noopener,noreferrer');
+  const handleCaptionClick = useCallback((postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setExpandedCaptions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handleProductBoxClick = useCallback((url: string | undefined, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, []);
 
@@ -130,9 +139,7 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
         {posts.map((post) => (
           <div
             key={post.id}
-            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px] cursor-pointer"
-            onClick={(event) => handlePostClick(post, event)}
-            title={post.product_featured?.url ? `Click to view ${post.product_featured.name}` : 'Product page not available'}
+            className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/15 transition-all duration-300 flex flex-col min-h-[400px] sm:min-h-[500px]"
           >
             {/* Day Header */}
             <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
@@ -165,29 +172,32 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
             )}
 
             {/* Caption */}
-            <div className="mb-3 sm:mb-4 flex-1 relative group">
+            <div 
+              className="mb-3 sm:mb-4 flex-1 cursor-pointer"
+              onClick={(e) => handleCaptionClick(post.id, e)}
+            >
               <p className="text-white/90 text-xs sm:text-sm leading-relaxed break-words overflow-hidden">
-                {post.caption_text.length > 150 
-                  ? `${post.caption_text.substring(0, 150)}...` 
-                  : post.caption_text}
+                {expandedCaptions.has(post.id) 
+                  ? post.caption_text
+                  : (post.caption_text.length > 150 
+                      ? `${post.caption_text.substring(0, 150)}...` 
+                      : post.caption_text)
+                }
               </p>
-              
-              {/* Tooltip for full caption on hover - only show if caption is truncated */}
               {post.caption_text.length > 150 && (
-                <div className="absolute z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                              bg-slate-900 text-white p-4 rounded-lg shadow-xl border border-white/20 
-                              left-0 right-0 bottom-full mb-2 max-h-64 overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap">{post.caption_text}</p>
-                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full">
-                    <div className="w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-slate-900"></div>
-                  </div>
-                </div>
+                <p className="text-white/50 text-xs mt-1">
+                  {expandedCaptions.has(post.id) ? 'Click to collapse' : 'Click to expand'}
+                </p>
               )}
             </div>
 
             {/* Product Info */}
             {post.product_featured && (
-              <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10">
+              <div 
+                className="mb-3 sm:mb-4 p-2 sm:p-3 bg-white/5 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
+                onClick={(e) => handleProductBoxClick(post.product_featured?.url, e)}
+                title={post.product_featured.url ? `Visit ${post.product_featured.name}` : 'Website not available'}
+              >
                 <h4 className="font-medium text-white text-xs sm:text-sm mb-1 truncate">
                   {post.product_featured.name}
                 </h4>
@@ -197,6 +207,14 @@ export const WeeklyCalendar = memo(function WeeklyCalendar({
                 {post.product_featured.description && (
                   <p className="text-white/50 text-xs line-clamp-2 break-words">
                     {post.product_featured.description}
+                  </p>
+                )}
+                {post.product_featured.url && (
+                  <p className="text-blue-400 text-xs mt-2 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Visit website
                   </p>
                 )}
               </div>

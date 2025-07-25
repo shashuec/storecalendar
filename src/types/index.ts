@@ -83,6 +83,7 @@ export interface WeeklyCalendar {
   country: CountryCode;
   brand_tone: BrandTone;
   selected_products: ShopifyProduct[];
+  share_token?: string; // Added for sharing functionality
 }
 
 export interface GenerationRequest {
@@ -112,6 +113,7 @@ export interface GenerationResponse {
   upcoming_holidays?: Holiday[];
   enhanced_products?: ShopifyProductEnhanced[];
   calendar_id?: string; // For sharing functionality
+  share_token?: string; // UUID share token for public URLs
 }
 
 // Business Type definitions

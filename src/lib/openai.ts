@@ -327,41 +327,57 @@ Incorporate this holiday naturally into the post. Make it relevant to the servic
 - Make "${selectedService}" the hero of this ${postType} post${usedServicesContext}` : '';
     
     const prompt = `
-You are a social media expert creating content for "${business.businessName}", a ${business.category.replace('_', ' ')} business.
+You are a social media content strategist creating engaging posts for "${business.businessName}", a ${business.category.replace(/_/g, ' ')} business.
 
 ${brandToneGuidance}
 
-BUSINESS DETAILS:
-- Category: ${business.category.replace('_', ' ')}
-- Location: ${business.location}
-- FEATURED SERVICE FOR THIS POST: ${selectedService}
-- Target Audience: ${business.targetAudience.ageRange} age group, ${business.targetAudience.gender}, ${business.targetAudience.style}
-- Content Goals: ${goalsContext}${holidayContext}${serviceVarietyNote}
+BUSINESS CONTEXT:
+- Business Type: ${business.category.replace(/_/g, ' ')}
+- Today's Featured Service: "${selectedService}"
+- Target Audience: ${business.targetAudience.ageRange}, ${business.targetAudience.gender}
+- Content Strategy: ${goalsContext}${serviceVarietyNote}
 
-Create a ${postType} post for ${dayName}.
+Create a ${postType} caption for ${dayName} that will stop scrollers and drive bookings.
 
-CRITICAL REQUIREMENTS:
-1. 🎯 MANDATORY: Feature ONLY "${selectedService}" in this caption
-2. 🚫 FORBIDDEN: Do not mention any other services except "${selectedService}"
-3. Create the entire ${postType} post around "${selectedService}" specifically
-4. Keep caption 150-280 characters (Instagram/Facebook optimized)
-5. Include 2-3 hashtags specifically related to "${selectedService}"
-6. Include location: 📍 ${business.location}
-7. End with clear call-to-action about "${selectedService}" (Book ${selectedService}, Try ${selectedService}, etc.)
-8. Make it authentic to ${business.category.replace('_', ' ')} business
-9. If holiday context provided, incorporate naturally with "${selectedService}"
-10. Match the ${business.brandVoice} brand voice exactly
+MODERN SOCIAL MEDIA RULES:
+1. START STRONG: First 3-5 words must grab attention (question, bold statement, or emotion)
+2. FOCUS: This entire post is about "${selectedService}" - make it the star
+3. BENEFITS OVER FEATURES: Don't just describe the service, show how it transforms lives
+4. SOCIAL PROOF: Include results, testimonials hints, or transformation language
+5. STORYTELLING: Use mini-stories, scenarios, or relatable moments
+6. CONVERSATIONAL: Write like you're talking to a friend, not advertising
+7. EMOTION: Make people FEEL something (confidence, relief, excitement, FOMO)
+8. URGENCY: Create gentle urgency without being pushy (limited spots, seasonal, etc.)
+9. SPECIFICITY: Use specific details, numbers, or results when possible
+10. VISUAL: Write in a way that makes people visualize the experience
 
-CAPTION FOCUS: Make "${selectedService}" the hero of this post. Every sentence should relate to "${selectedService}".
+CAPTION STRUCTURE:
+- Hook (attention-grabbing first line)
+- Value/Story (why they need ${selectedService})
+- Social proof or transformation
+- Clear, specific CTA for ${selectedService}
+- 3-5 relevant hashtags
 
-Return ONLY the caption text, nothing else.`;
+CHARACTER LIMIT: 200-350 characters for optimal engagement
+
+
+${postType} THEME: Make this caption fit the ${postType} vibe while featuring ${selectedService}.
+
+AVOID:
+- Generic phrases like "Book now" or "Call us today"
+- Listing features without emotional benefits
+- Sounding salesy or pushy
+- Using too many emojis (2-3 max)
+- Being vague about results
+
+Return ONLY the caption text with proper formatting and line breaks.`;
 
     const completion = await openai.chat.completions.create({
       model,
       messages: [
         {
           role: 'system',
-          content: 'You are an expert social media content creator for service businesses. Create engaging, authentic posts that drive customer action.'
+          content: 'You are a viral social media content strategist who creates scroll-stopping captions that convert viewers into customers. You understand modern social media psychology and create authentic, emotional content that drives action without being salesy.'
         },
         {
           role: 'user',
@@ -396,12 +412,22 @@ function createServiceFallback(
   dayName: string,
   holiday?: Holiday
 ): string {
-  const holidayMention = holiday ? ` Perfect timing for ${holiday.name}!` : '';
-  const services = business.services.slice(0, 2).join(' & ');
+  const holidayMention = holiday ? ` (Perfect for ${holiday.name})` : '';
+  const service = business.services[0] || 'services';
   
-  const baseCaption = `🌟 ${postType} at ${business.businessName}!${holidayMention} Experience our amazing ${services} services. Your satisfaction is our priority!`;
-  const location = `\n\n📍 ${business.location}`;
-  const cta = business.website ? `\n🔗 Book now: ${business.website}` : '\n📞 Call us to book!';
+  // More engaging fallback captions based on post type
+  const fallbacks: { [key: string]: string } = {
+    'Monday': `New week, new you? 💫 Start your ${dayName} right with our ${service}${holidayMention}. Limited spots available this week!`,
+    'Tuesday': `That ${dayName} feeling when you finally treat yourself to ${service} 🙌 Why wait for the weekend?`,
+    'Wednesday': `Halfway through the week already? Time flies when you're due for ${service}. Let's fix that today!`,
+    'Thursday': `Almost Friday! Celebrate early with our relaxing ${service}. You've earned it! ✨`,
+    'Friday': `TGIF! End your week on a high note with ${service}. Weekend appointments filling fast!`,
+    'Saturday': `Weekend vibes + ${service} = Pure bliss 🌟 Treat yourself, you deserve it!`,
+    'Sunday': `Self-care Sunday calling! Recharge with our ${service} before Monday hits.`
+  };
   
-  return `${baseCaption}${location}${cta} #${business.category.replace('_', '')} #LocalBusiness`;
+  const baseCaption = fallbacks[dayName] || `Ready for amazing ${service}? Your transformation starts here!`;
+  const hashtags = `\n\n#${business.businessName.replace(/\s+/g, '')} #${service.replace(/\s+/g, '')} #${business.category.replace(/_/g, '')}`;
+  
+  return `${baseCaption}${hashtags}`;
 }

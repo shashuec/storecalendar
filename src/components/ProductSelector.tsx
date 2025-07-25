@@ -39,8 +39,20 @@ export const ProductSelector = memo(function ProductSelector({
       filtered = filtered.filter(p => p.product_type === filterType);
     }
     
+    // Sort selected products to appear first
+    filtered = [...filtered].sort((a, b) => {
+      const aSelected = selectedProducts.includes(a.id);
+      const bSelected = selectedProducts.includes(b.id);
+      
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      
+      // If both have same selection status, sort by rank
+      return (a.rank || 999) - (b.rank || 999);
+    });
+    
     return filtered;
-  }, [products, searchQuery, filterType]);
+  }, [products, searchQuery, filterType, selectedProducts]);
 
   // Get products to display (with limit)
   const productsToDisplay = useMemo(() => {
@@ -192,7 +204,7 @@ export const ProductSelector = memo(function ProductSelector({
                   return (
                     <div
                       key={product.id}
-                      className={`p-4 flex items-center space-x-3 transition-colors ${isSelected ? 'bg-blue-50' : 'bg-white'} ${isClickable ? 'hover:bg-gray-50 cursor-pointer' : ''} ${!isClickable && !isSelected ? 'opacity-50' : ''}`}
+                      className={`p-4 flex items-center space-x-3 transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-white'} ${isClickable ? 'hover:bg-gray-50 cursor-pointer' : ''} ${!isClickable && !isSelected ? 'opacity-50' : ''}`}
                       onClick={() => isClickable && handleProductToggle(product.id)}
                     >
                       {/* Checkbox */}
@@ -216,6 +228,11 @@ export const ProductSelector = memo(function ProductSelector({
                         </div>
                         
                         <div className="flex items-center space-x-2 mt-1">
+                          {isSelected && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              Selected
+                            </span>
+                          )}
                           {product.product_type && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                               {product.product_type}

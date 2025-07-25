@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, createAuthError } from '@/lib/auth-middleware';
+import { cleanAndMergeServices } from '@/lib/service-cleaning';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +44,16 @@ export async function POST(request: NextRequest) {
     // Extract business information from scraped content with auto-detected category
     const businessInfo = extractBusinessInfo(content);
 
+    // Check if no services were found
+    if (!businessInfo.services || businessInfo.services.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'No services found on this website. Please ensure the URL contains a services page or try a different URL.',
+        businessName: businessInfo.businessName,
+        category: businessInfo.category
+      }, { status: 400 });
+    }
+
     return NextResponse.json({
       success: true,
       ...businessInfo,
@@ -62,32 +73,28 @@ export async function POST(request: NextRequest) {
 }
 
 function extractBusinessInfo(content: string) {
-  // Extract business name (usually in title or h1)
-  const titleMatch = content.match(/title":"([^"]+)"|# ([^#\n]+)/);
-  let businessName = titleMatch ? (titleMatch[1] || titleMatch[2]) : 'Business';
+  // Extract business name from various sources
+  let businessName = 'Business';
   
-  // Clean up business name - remove extra info
-  businessName = businessName.split('|')[0].trim();
-  businessName = businessName.replace(/\s*-\s*.*$/, '').trim();
-
-  // Extract location - look for various patterns
-  let location = 'Location';
-  
-  // Try to find address in various formats
-  const addressPatterns = [
-    /(\d+[^,]*,\s*[^,]+,\s*[^,]+,\s*[^,]+)/i, // Full address format
-    /Sector\s*\d+[^,]*,[^,]+/i, // Sector based addresses
-    /(\d+\s+[\w\s]+(?:street|st|avenue|ave|road|rd|boulevard|blvd|sector|market)[^,]*,[^,]+)/i,
-    /Address[:\s-]+([^\n]+)/i // Address label
-  ];
-  
-  for (const pattern of addressPatterns) {
-    const match = content.match(pattern);
-    if (match) {
-      location = match[0].replace(/Address[:\s-]+/i, '').trim();
-      break;
+  // Try JSON format first (like your example)
+  const jsonTitleMatch = content.match(/"title"\s*:\s*"([^"]+)"/);
+  if (jsonTitleMatch) {
+    businessName = jsonTitleMatch[1];
+  } else {
+    // Try markdown title or h1
+    const titleMatch = content.match(/^#\s+([^#\n]+)|<h1[^>]*>([^<]+)<\/h1>/im);
+    if (titleMatch) {
+      businessName = titleMatch[1] || titleMatch[2];
     }
   }
+  
+  // Clean up business name - remove SEO additions
+  businessName = businessName
+    .split('|')[0] // Remove everything after pipe
+    .split('-')[0] // Remove everything after first dash (often contains location/SEO)
+    .replace(/\s*(Best|Top|in|near|at)\s+.*/i, '') // Remove "Best ... in City" type additions
+    .replace(/\s*&\s*/, ' & ') // Clean up ampersands
+    .trim();
 
   // Auto-detect service category from content
   const category = autoDetectServiceCategory(content);
@@ -100,7 +107,6 @@ function extractBusinessInfo(content: string) {
 
   return {
     businessName: businessName.substring(0, 100), // Limit length
-    location: location.substring(0, 200),
     category,
     services,
     targetAudience
@@ -110,6 +116,26 @@ function extractBusinessInfo(content: string) {
 function extractServices(content: string, category: string): string[] {
   const services: Set<string> = new Set();
   
+  // === START: UNIVERSAL_SERVICE_EXTRACTION_FIX ===
+  // Enhanced exclusion list for generic CTAs and navigation
+  const excludePhrases = [
+    'explore services', 'our services', 'view services', 'see services',
+    'learn more', 'read more', 'find out', 'discover more',
+    'get started', 'book now', 'contact us', 'call us',
+    'click here', 'see all', 'view all', 'show more',
+    'services', 'service', 'offerings', 'solutions'
+  ];
+  
+  // Function to check if a string is a generic CTA or navigation
+  const isGenericCTA = (text: string): boolean => {
+    const lower = text.toLowerCase().trim();
+    return excludePhrases.some(phrase => 
+      lower === phrase || 
+      lower.startsWith(phrase + ' ') ||
+      lower.endsWith(' ' + phrase)
+    );
+  };
+  
   // Enhanced service extraction from navigation/menu links
   const menuPattern = /\[([^\]]+)\]\(https?:\/\/[^)]+\/([\w-]+)\/?\)/g;
   let menuMatch;
@@ -117,8 +143,11 @@ function extractServices(content: string, category: string): string[] {
     const serviceName = menuMatch[1];
     const urlSlug = menuMatch[2];
     
+    // Skip if it's a generic CTA
+    if (isGenericCTA(serviceName)) continue;
+    
     // Filter out non-service links with expanded exclusions
-    const excludeTerms = ['home', 'about', 'contact', 'blog', 'privacy', 'terms', 'career', 'courses', 'appointment', 'book'];
+    const excludeTerms = ['home', 'about', 'contact', 'blog', 'privacy', 'terms', 'career', 'courses', 'appointment', 'book', 'explore', 'services'];
     if (!excludeTerms.some(term => urlSlug.toLowerCase().includes(term))) {
       // Clean up service names more thoroughly
       const cleanedService = serviceName
@@ -127,22 +156,31 @@ function extractServices(content: string, category: string): string[] {
         .replace(/\s+/g, ' ')
         .trim();
       
-      if (cleanedService.length > 3 && cleanedService.length < 50 && !cleanedService.match(/^(Home|About|Contact)$/i)) {
+      if (cleanedService.length > 3 && cleanedService.length < 50 && 
+          !cleanedService.match(/^(Home|About|Contact|Services|Explore)$/i) &&
+          !isGenericCTA(cleanedService)) {
         services.add(cleanedService);
       }
     }
   }
+  // === END: UNIVERSAL_SERVICE_EXTRACTION_FIX ===
   
   // Extract services from menu structures (like nested menus)
   const nestedMenuPattern = /\*\s+\[([^\]]+)\]\([^)]+\)/g;
   let nestedMatch;
   while ((nestedMatch = nestedMenuPattern.exec(content)) !== null) {
     const serviceName = nestedMatch[1];
+    
+    // === UNIVERSAL_SERVICE_EXTRACTION_FIX: Apply same filtering ===
+    if (isGenericCTA(serviceName)) continue;
+    
     const cleanedService = serviceName
       .replace(/Menu Toggle/gi, '')
       .trim();
     
-    if (cleanedService.length > 3 && cleanedService.length < 50 && !cleanedService.match(/^(Home|About|Contact)$/i)) {
+    if (cleanedService.length > 3 && cleanedService.length < 50 && 
+        !cleanedService.match(/^(Home|About|Contact|Services|Explore)$/i) &&
+        !isGenericCTA(cleanedService)) {
       services.add(cleanedService);
     }
   }
@@ -157,20 +195,45 @@ function extractServices(content: string, category: string): string[] {
     }
   }
 
-  // Category-specific service extraction for health/medical
-  if (category === 'health_medical' || category === 'salon_spa') {
-    // Look for treatment patterns
-    const treatmentPattern = /(\w+\s+)?(?:treatment|therapy|procedure|facial|peel|laser|reduction|hair|skin|anti[- ]?aging|rejuvenation|lifting|brightening|pigmentation|acne|scar)(?:\s+\w+)?/gi;
-    const matches = content.match(treatmentPattern);
-    if (matches) {
-      matches.forEach(match => {
-        const cleaned = match.trim();
-        if (cleaned.length > 5 && cleaned.length < 50) {
-          services.add(cleaned);
-        }
-      });
+  // === UNIVERSAL_SERVICE_EXTRACTION_FIX: Enhanced service patterns ===
+  // Look for services in list patterns (bullets, numbers, etc.)
+  const listPatterns = [
+    /(?:^|\n)\s*[•·▪▸→]\s*([A-Za-z][A-Za-z\s&'-]+?)(?=\n|$)/gm,
+    /(?:^|\n)\s*\d+\.\s*([A-Za-z][A-Za-z\s&'-]+?)(?=\n|$)/gm,
+    /(?:^|\n)\s*[-*]\s*([A-Za-z][A-Za-z\s&'-]+?)(?=\n|$)/gm
+  ];
+  
+  listPatterns.forEach(pattern => {
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const service = match[1].trim();
+      if (service.length > 5 && service.length < 50 && !isGenericCTA(service)) {
+        services.add(service);
+      }
     }
+  });
+  
+  // Category-specific service extraction
+  const servicePatterns = {
+    'health_medical': /(\w+\s+)?(?:treatment|therapy|procedure|consultation|surgery|examination|screening|diagnosis|care)(?:\s+\w+)?/gi,
+    'salon_spa': /(\w+\s+)?(?:facial|peel|laser|hair|manicure|pedicure|massage|waxing|threading|coloring|styling|makeup)(?:\s+\w+)?/gi,
+    'gym_fitness': /(\w+\s+)?(?:training|workout|class|yoga|pilates|zumba|crossfit|cardio|strength|bootcamp|fitness)(?:\s+\w+)?/gi,
+    'food_dining': /(\w+\s+)?(?:catering|delivery|takeout|dining|buffet|party|event|special)(?:\s+\w+)?/gi,
+    'professional_services': /(\w+\s+)?(?:consulting|audit|legal|accounting|advisory|analysis|management|design|development)(?:\s+\w+)?/gi,
+    'other': /(\w+\s+)?(?:service|repair|installation|maintenance|support|solution|package|program|plan)(?:\s+\w+)?/gi
+  };
+  
+  const categoryPattern = servicePatterns[category as keyof typeof servicePatterns] || servicePatterns['other'];
+  const matches = content.match(categoryPattern);
+  if (matches) {
+    matches.forEach(match => {
+      const cleaned = match.trim();
+      if (cleaned.length > 5 && cleaned.length < 50 && !isGenericCTA(cleaned)) {
+        services.add(cleaned);
+      }
+    });
   }
+  // === END: UNIVERSAL_SERVICE_EXTRACTION_FIX ===
 
   // Convert Set to Array and return top services
   let servicesArray = Array.from(services);
@@ -192,13 +255,17 @@ function extractServices(content: string, category: string): string[] {
     servicesArray = Array.from(services);
   }
 
-  // Shuffle the services array to avoid bias towards first items
-  const shuffledServices = servicesArray.sort(() => 0.5 - Math.random());
+  // Don't shuffle - keep the order for consistency
+  // console.log('Raw extracted services:', servicesArray); // Debug log
+  // console.log('Total raw services found:', servicesArray.length);
   
-  // console.log('Extracted services:', shuffledServices); // Debug log
+  // Clean and merge services using the new cleaning utility
+  const cleanedServices = cleanAndMergeServices(servicesArray);
+  // console.log('Cleaned services:', cleanedServices);
+  // console.log('Total cleaned services:', cleanedServices.length);
   
-  // Return top 10 services (more comprehensive list)
-  return shuffledServices.slice(0, 10);
+  // Return cleaned services
+  return cleanedServices;
 }
 
 function autoDetectServiceCategory(content: string): string {
