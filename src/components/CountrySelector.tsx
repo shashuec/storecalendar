@@ -95,12 +95,12 @@ export function CountrySelectorCompact({
         disabled={disabled}
         className={`
           w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
-          focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black
+          focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black text-sm
           ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
         `}
       >
         {SUPPORTED_COUNTRIES.map((country) => (
-          <option key={country.code} value={country.code}>
+          <option key={country.code} value={country.code} className="text-sm">
             {country.flag} {country.name}
           </option>
         ))}

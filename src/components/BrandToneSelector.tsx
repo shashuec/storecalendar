@@ -153,19 +153,19 @@ export function BrandToneSelectorCompact({
         disabled={disabled}
         className={`
           w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm
-          focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black
+          focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black text-sm
           ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}
         `}
       >
         {BRAND_TONES.map((tone) => (
-          <option key={tone.id} value={tone.id}>
-            {tone.name} - {tone.description.substring(0, 40)}...
+          <option key={tone.id} value={tone.id} className="text-sm">
+            {tone.name}
           </option>
         ))}
       </select>
       
       {/* Selected tone description */}
-      <p className="text-xs text-white/70">
+      <p className="text-xs text-white/70 line-clamp-2">
         {BRAND_TONES.find(t => t.id === selectedTone)?.description}
       </p>
     </div>
