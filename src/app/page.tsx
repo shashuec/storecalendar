@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { GenerationResponse, CountryCode, BrandTone, BusinessType, ServiceCategory, ServiceBusiness } from '@/types';
+import { GenerationResponse, CountryCode, BrandTone, BusinessType, ServiceCategory, ServiceBusiness, WeeklyCalendar as WeeklyCalendarType, ShopifyProductEnhanced } from '@/types';
 import { CountrySelectorCompact } from '@/components/CountrySelector';
 import { ProductSelector } from '@/components/ProductSelector';
 import { BrandToneSelectorCompact } from '@/components/BrandToneSelector';
@@ -18,25 +19,10 @@ import { PageLoader, InlineLoader } from '@/components/Loader';
 import DemoVideo from '@/components/DemoVideo';
 import PreviousCalendars from '@/components/PreviousCalendars';
 import BusinessTypeSelector from '@/components/BusinessTypeSelector';
+import { ServiceSelector } from '@/components/ServiceSelector';
+import ContactModal from '@/components/ContactModal';
 // Removed unused imports: BusinessDetailsForm, ContentGoalsSelector - using auto-detection flow
 
-// Local interfaces for removed components
-interface BusinessDetails {
-  businessName: string;
-  location: string;
-  website: string;
-  services: string[];
-}
-
-interface ContentGoalsData {
-  contentGoals: string[];
-  brandVoice: BrandTone;
-  targetAudience: {
-    ageRange: string;
-    gender: string;
-    style: string;
-  };
-}
 
 export default function HomePage() {
   // Auth state
@@ -52,11 +38,12 @@ export default function HomePage() {
   const [error, setError] = useState('');
   
   // V1 form state - initialize based on auth state
-  const [currentStep, setCurrentStep] = useState<'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceTone'>('businessType');
+  const [currentStep, setCurrentStep] = useState<'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceSelection' | 'serviceTone'>('businessType');
   const [selectedCountry, setSelectedCountry] = useState<CountryCode>('US');
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedTone, setSelectedTone] = useState<BrandTone>('casual');
   const [weekNumber, setWeekNumber] = useState<1 | 2>(1);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   
   // Business type flow state
   const [businessType, setBusinessType] = useState<BusinessType | null>(null);
@@ -80,6 +67,15 @@ export default function HomePage() {
   
   // Logo reset loading state
   const [isResetting, setIsResetting] = useState(false);
+  
+  // Profile dropdown visibility state
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  
+  // Contact modal state
+  const [showContactModal, setShowContactModal] = useState(false);
 
   // Reset all state and go to homepage
   const resetToHomepage = useCallback(() => {
@@ -96,16 +92,24 @@ export default function HomePage() {
       setSelectedProducts([]);
       setSelectedTone('casual');
       setWeekNumber(1);
+      setSelectedServices([]);
       setCopiedCaption(null);
       setShowUpgradePrompt(false);
       setShowFeedbackModal(false);
       setGeneratingDay(1);
-      setIsResetting(false);
       
-      // Clear any localStorage data if needed
-      // localStorage.removeItem('someKey'); // Add if you have persisted data
+      // Reset business type flow state
+      setBusinessType(null);
+      setServiceCategory(null);
+      setServiceUrl('');
+      setServiceBusiness(null);
+      
+      // Clear persisted state
+      clearState();
+      
+      setIsResetting(false);
     }, 800); // Brief loading for good UX
-  }, []);
+  }, [clearState]);
   
   // Check usage on component mount
   useEffect(() => {
@@ -177,12 +181,13 @@ export default function HomePage() {
   
   // Auto-select products when enhanced products are loaded (only once)
   useEffect(() => {
-    if (enhancedProducts.length > 0 && selectedProducts.length === 0) {
+    // Only auto-select if we're on the products step and have enhanced products
+    if (currentStep === 'products' && enhancedProducts.length > 0 && selectedProducts.length === 0) {
       const autoSelected = smartSelectProducts(enhancedProducts, 5);
       const selectedIds = autoSelected.filter(p => p.selected).map(p => p.id);
       setSelectedProducts(selectedIds);
     }
-  }, [enhancedProducts, selectedProducts.length]);
+  }, [enhancedProducts, selectedProducts.length, currentStep]);
 
   // Handle service URL scraping and processing
   const handleServiceUrlScraping = useCallback(async () => {
@@ -210,6 +215,10 @@ export default function HomePage() {
       const data = await scrapedData.json();
 
       if (!scrapedData.ok) {
+        // Check if it's a no services found error
+        if (data.error && data.error.includes('No services found')) {
+          throw new Error('No services found on this website. Try adding /services or /treatments to the URL, or enter a different website.');
+        }
         throw new Error(data.error || 'Failed to scrape business information');
       }
 
@@ -217,10 +226,13 @@ export default function HomePage() {
       const detectedCategory = data.category || 'other';
       setServiceCategory(detectedCategory); // Update state with detected category
       
+      // Log scraped services for debugging
+      console.log('Scraped services from website:', data.services);
+      
       const serviceBiz: ServiceBusiness = {
         businessName: data.businessName || 'Business',
         category: detectedCategory,
-        location: data.location || 'Location',
+        location: '', // Location not required anymore
         website: serviceUrl,
         businessUrl: serviceUrl, // Ensure businessUrl is set
         services: data.services || [],
@@ -235,14 +247,15 @@ export default function HomePage() {
         scrapedContent: data.scrapedContent // Include the scraped content
       };
 
+      console.log('ServiceBusiness object created with services:', serviceBiz.services);
       setServiceBusiness(serviceBiz);
       
       // Check if user is authenticated
       if (!user) {
         setCurrentStep('auth');
       } else {
-        // Generate calendar directly
-        await handleGenerateServiceCalendar(serviceBiz);
+        // Move to service selection step instead of generating directly
+        setCurrentStep('serviceSelection');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
@@ -472,8 +485,40 @@ export default function HomePage() {
     }
   }, [currentStep, user, loading, businessType, url, result?.enhanced_products, serviceBusiness, handleGenerateServiceCalendar]);
 
+  // Handle click outside to close profile dropdown and update position on scroll
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+    };
+
+    const handleScroll = () => {
+      if (showProfileDropdown && profileButtonRef.current) {
+        const rect = profileButtonRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + window.scrollY + 8,
+          right: window.innerWidth - rect.right
+        });
+      }
+    };
+
+    if (showProfileDropdown) {
+      // Use 'click' instead of 'mousedown' to allow calendar clicks to process
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('scroll', handleScroll);
+      window.addEventListener('resize', handleScroll);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [showProfileDropdown]);
+
   // Memoized step navigation functions to prevent unnecessary re-renders
-  const handleNextStep = useCallback(() => {
+  const handleNextStep = useCallback(async () => {
     setError('');
     
     // Handle service business flow
@@ -482,10 +527,22 @@ export default function HomePage() {
         setError('Please enter a business URL');
         return;
       }
+      // Scrape the service URL to get business info and services
+      handleServiceUrlScraping();
+    } else if (currentStep === 'serviceSelection') {
+      if (selectedServices.length < 1) {
+        setError('Please select at least one service');
+        return;
+      }
       setCurrentStep('serviceTone');
     } else if (currentStep === 'serviceTone') {
-      // Process the URL and generate calendar
-      handleServiceUrlScraping();
+      // Generate calendar with selected services
+      if (serviceBusiness) {
+        await handleGenerateServiceCalendar({
+          ...serviceBusiness,
+          services: selectedServices // Use only selected services
+        });
+      }
     // businessDetails step removed
       return;
     } else if (currentStep === 'url') {
@@ -509,7 +566,7 @@ export default function HomePage() {
       // Generate the final calendar
       handleGenerate();
     }
-  }, [currentStep, url, user, selectedProducts.length, handleGenerate, serviceUrl, handleServiceUrlScraping]);
+  }, [currentStep, url, user, selectedProducts.length, handleGenerate, serviceUrl, handleServiceUrlScraping, selectedServices, serviceBusiness, handleGenerateServiceCalendar]);
 
   const handlePrevStep = useCallback(() => {
     setError('');
@@ -526,8 +583,10 @@ export default function HomePage() {
     }
     else if (currentStep === 'serviceUrl' && user) {
       setCurrentStep('businessType');
-    } else if (currentStep === 'serviceTone') {
+    } else if (currentStep === 'serviceSelection') {
       setCurrentStep('serviceUrl');
+    } else if (currentStep === 'serviceTone') {
+      setCurrentStep('serviceSelection');
     // businessDetails and contentGoals steps removed
     } else if (currentStep === 'products') {
       // Clear selected products and results when going back from product selection
@@ -551,6 +610,82 @@ export default function HomePage() {
     setCurrentStep('results');
     handleGenerate();
   }, [handleGenerate]);
+
+  // Load a previous calendar
+  const loadPreviousCalendar = useCallback(async (calendar: { 
+    id: string; 
+    businessType: string; 
+    storeName: string; 
+    storeUrl: string; 
+    weekNumber: number; 
+    weeklyCalendar: WeeklyCalendarType; 
+    enhancedProducts: ShopifyProductEnhanced[]; 
+    serviceCategory?: string; 
+    services?: string[];
+    brandTone?: BrandTone;
+  }) => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Fetch the full calendar data
+      const response = await fetch(`/api/calendar/${calendar.id}`, {
+        headers: getAuthHeaders(),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load calendar');
+      }
+      
+      if (data.success && data.calendar) {
+        // Set the calendar data to display
+        setResult({
+          success: true,
+          weekly_calendar: data.calendar.weeklyCalendar,
+          enhanced_products: data.calendar.enhancedProducts || [],
+          store_name: data.calendar.storeName,
+          calendar_id: data.calendar.id
+        });
+        
+        // Update other relevant states
+        setCurrentStep('results');
+        setWeekNumber(data.calendar.weekNumber as 1 | 2);
+        
+        // Reset business type based on calendar
+        if (data.calendar.businessType) {
+          setBusinessType(data.calendar.businessType);
+          
+          // If it's a service business, set the service business data
+          if (data.calendar.businessType === 'service') {
+            setServiceBusiness({
+              businessName: data.calendar.storeName,
+              location: '',
+              website: data.calendar.storeUrl,
+              businessUrl: data.calendar.storeUrl,
+              category: data.calendar.serviceCategory || 'other',
+              services: data.calendar.services || [],
+              contentGoals: ['appointments', 'showcase', 'community'],
+              brandVoice: data.calendar.brandTone || 'casual',
+              brandTone: data.calendar.brandTone || 'casual',
+              targetAudience: {
+                ageRange: '25-45',
+                gender: 'All',
+                style: 'General audience'
+              }
+            });
+          }
+        }
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load calendar';
+      setError(errorMessage);
+      console.error('Error loading calendar:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [getAuthHeaders]);
 
 
 
@@ -589,13 +724,13 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 relative">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/15 via-transparent to-transparent" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-900/15 via-transparent to-transparent" />
       
       {/* Header */}
-      <header className="relative px-4 lg:px-6 h-16 sm:h-20 flex items-center border-b border-white/10 bg-black/20 backdrop-blur-xl">
+      <header className="relative px-4 lg:px-6 h-16 sm:h-20 flex items-center border-b border-white/10 bg-black/20 backdrop-blur-xl z-50">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <div className="flex items-center space-x-2 sm:space-x-3 cursor-pointer hover:opacity-80 transition-opacity" onClick={resetToHomepage}>
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -618,20 +753,54 @@ export default function HomePage() {
                 <a href="#faq" className="hidden sm:block text-white/80 hover:text-white transition-all duration-300 text-sm font-medium">
                   FAQ
                 </a>
+                <button 
+                  onClick={() => setShowContactModal(true)}
+                  className="text-white/80 hover:text-white transition-all duration-300 text-sm font-medium"
+                >
+                  Contact
+                </button>
               </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2">
-                  {user.picture && (
-                    <Image 
-                      src={user.picture} 
-                      alt={user.name}
-                      width={28}
-                      height={28}
-                      className="rounded-full sm:w-8 sm:h-8"
-                    />
-                  )}
-                  <span className="hidden sm:block text-white/90 text-sm">{user.name}</span>
+                <div className="relative z-50" ref={profileDropdownRef}>
+                  <div className="flex items-center gap-2">
+                    {user.picture && (
+                      <button
+                        ref={profileButtonRef}
+                        onClick={() => {
+                          if (!showProfileDropdown && profileButtonRef.current) {
+                            const rect = profileButtonRef.current.getBoundingClientRect();
+                            // Use fixed positioning relative to viewport
+                            setDropdownPosition({
+                              top: rect.bottom + window.scrollY + 8,
+                              right: window.innerWidth - rect.right
+                            });
+                          }
+                          setShowProfileDropdown(!showProfileDropdown);
+                        }}
+                        className="flex items-center gap-2"
+                      >
+                        <Image 
+                          src={user.picture} 
+                          alt={user.name}
+                          width={28}
+                          height={28}
+                          className="rounded-full sm:w-8 sm:h-8 cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-white/50"
+                        />
+                        <span className="hidden sm:block text-white/90 text-sm">{user.name}</span>
+                        {/* Dropdown arrow */}
+                        <svg 
+                          className={`w-4 h-4 text-white/70 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  
                 </div>
                 <Button
                   onClick={logout}
@@ -743,15 +912,17 @@ export default function HomePage() {
                         <label htmlFor="serviceUrl" className="block text-sm font-medium text-white/90 mb-3">
                           Your Business Website or Social Media URL
                         </label>
-                        <Input
-                          id="serviceUrl"
-                          type="url"
-                          placeholder="e.g., mybusiness.com or instagram.com/mybusiness"
-                          value={serviceUrl}
-                          onChange={(e) => setServiceUrl(e.target.value)}
-                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
-                          disabled={loading}
-                        />
+                        <div className="max-w-md mx-auto">
+                          <Input
+                            id="serviceUrl"
+                            type="url"
+                            placeholder="e.g., mybusiness.com or instagram.com/mybusiness"
+                            value={serviceUrl}
+                            onChange={(e) => setServiceUrl(e.target.value)}
+                            className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
+                            disabled={loading}
+                          />
+                        </div>
                         <p className="text-white/50 text-xs mt-2">
                           Supports: Website, Instagram, Facebook, Google Business Profile
                         </p>
@@ -759,7 +930,16 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {/* Step 3: Service Tone Selection */}
+                  {/* Step 3: Service Selection */}
+                  {currentStep === 'serviceSelection' && serviceBusiness && (
+                    <ServiceSelector
+                      services={serviceBusiness.services}
+                      selectedServices={selectedServices}
+                      onServicesChange={setSelectedServices}
+                    />
+                  )}
+
+                  {/* Step 4: Service Tone Selection */}
                   {currentStep === 'serviceTone' && (
                     <div className="space-y-4 sm:space-y-6">
                       <div className="text-center mb-4">
@@ -767,11 +947,13 @@ export default function HomePage() {
                         <p className="text-xs sm:text-sm text-white/70 px-4">Choose how you want to communicate with your audience</p>                        
                       </div>
                       
-                      <BrandToneSelectorCompact
-                        selectedTone={selectedTone}
-                        onToneChange={setSelectedTone}
-                        disabled={loading}
-                      />
+                      <div className="max-w-md mx-auto">
+                        <BrandToneSelectorCompact
+                          selectedTone={selectedTone}
+                          onToneChange={setSelectedTone}
+                          disabled={loading}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -784,15 +966,17 @@ export default function HomePage() {
                         <label htmlFor="url" className="block text-sm font-medium text-white/90 mb-3">
                           Enter Your E-commerce Store URL
                         </label>
-                        <Input
-                          id="url"
-                          type="url"
-                          placeholder="e.g., mystore.myshopify.com or myshop.com"
-                          value={url}
-                          onChange={(e) => setUrl(e.target.value)}
-                          className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
-                          disabled={loading}
-                        />
+                        <div className="max-w-md mx-auto">
+                          <Input
+                            id="url"
+                            type="url"
+                            placeholder="e.g., mystore.myshopify.com or myshop.com"
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            className="w-full bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/50 rounded-xl h-12 sm:h-14 px-3 sm:px-4 focus:bg-white/20 focus:border-blue-400 transition-all duration-300 text-sm sm:text-base"
+                            disabled={loading}
+                          />
+                        </div>
                        
                       </div>
                     </div>
@@ -845,7 +1029,7 @@ export default function HomePage() {
                         <p className="text-xs sm:text-sm text-white/70 px-4">Choose your country for holiday-aware content and select your brand voice</p>                        
                       </div>
                       
-                      <div className="space-y-3 sm:space-y-4">
+                      <div className="max-w-md mx-auto space-y-3 sm:space-y-4">
                         <CountrySelectorCompact
                           selectedCountry={selectedCountry}
                           onCountryChange={setSelectedCountry}
@@ -969,17 +1153,15 @@ export default function HomePage() {
                   )}
 
                   {/* Navigation Buttons - Hide for steps with their own submit buttons */}
-                  {currentStep !== 'results' && currentStep !== 'auth' && (
+                  {currentStep !== 'results' && currentStep !== 'auth' && currentStep !== 'businessType' && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 pt-4 sm:pt-6">
-                      {currentStep !== 'businessType' ? (
-                        <Button
-                          onClick={handlePrevStep}
-                          disabled={loading}
-                          className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base order-2 sm:order-1"
-                        >
-                          ← Back
-                        </Button>
-                      ) : <div className="hidden sm:block" />}
+                      <Button
+                        onClick={handlePrevStep}
+                        disabled={loading}
+                        className="bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl border border-white/20 transition-all duration-300 text-sm sm:text-base order-2 sm:order-1"
+                      >
+                        ← Back
+                      </Button>
                       
                       <Button
                         onClick={handleNextStep}
@@ -995,8 +1177,8 @@ export default function HomePage() {
                           />
                         ) : (
                           <>
-                            {currentStep === 'businessType' ? 'Continue' :
-                             currentStep === 'serviceUrl' ? 'Continue' :
+                            {currentStep === 'serviceUrl' ? 'Continue' :
+                             currentStep === 'serviceSelection' ? 'Continue' :
                              currentStep === 'serviceTone' ? 'Generate Calendar' :
                              currentStep === 'url' ? 'Load Products' :
                              currentStep === 'products' ? 'Set Preferences' :
@@ -1011,10 +1193,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Previous Calendars Section - Only show for authenticated users */}
-              {user && (
-                <PreviousCalendars className="max-w-6xl mx-auto mb-8 sm:mb-16" />
-              )}
 
               {/* Demo Video Section */}
               <DemoVideo className="max-w-6xl mx-auto mb-8 sm:mb-16" />
@@ -1714,24 +1892,61 @@ export default function HomePage() {
             </div>
           </section>
 
-      {/* Footer */}
-      <footer className="px-4 lg:px-6 py-8 sm:py-12 bg-slate-900 border-t border-white/10">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-xs sm:text-sm">SC</span>
-            </div>
-            <span className="font-bold text-base sm:text-lg text-white">StoreCalendar</span>
-          </div>
-          <p className="text-white/60 text-xs sm:text-sm px-4">&copy; 2024 StoreCalendar. E-commerce content automation platform starting with Shopify.</p>
-        </div>
-      </footer>
 
       {/* Feedback Modal */}
       <FeedbackModal 
         isOpen={showFeedbackModal}
         onClose={() => setShowFeedbackModal(false)}
         storeName={result?.store_name}
+      />
+      
+      {/* Profile Dropdown Portal */}
+      {showProfileDropdown && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={profileDropdownRef}
+          className="absolute w-80 bg-white/10 backdrop-blur-md rounded-lg shadow-lg border border-white/20"
+          style={{
+            position: 'absolute',
+            top: `${dropdownPosition.top}px`,
+            right: `${dropdownPosition.right}px`,
+            zIndex: 999999
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-2">
+            <div className="text-white/90 text-sm font-medium px-3 py-2 border-b border-white/10">
+              Previous Calendars
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              <PreviousCalendars 
+                className="" 
+                compact={true}
+                onCalendarClick={(calendar) => {
+                  // Open calendar in new tab using public URL
+                  if (calendar.publicUrl) {
+                    window.open(calendar.publicUrl, '_blank');
+                  } else if (calendar.shareToken) {
+                    // Construct public URL if not provided but share token exists
+                    const baseUrl = window.location.origin;
+                    window.open(`${baseUrl}/${calendar.shareToken}`, '_blank');
+                  } else {
+                    // Fallback to calendar ID (for backwards compatibility)
+                    window.open(`/calendar/${calendar.id}`, '_blank');
+                  }
+                  // Close dropdown after opening
+                  setTimeout(() => setShowProfileDropdown(false), 100);
+                }}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      
+      {/* Contact Modal */}
+      <ContactModal 
+        isOpen={showContactModal} 
+        onClose={() => setShowContactModal(false)} 
       />
     </div>
   );

@@ -12,53 +12,41 @@ interface BusinessTypeSelectorProps {
 export default function BusinessTypeSelector({ onSelect, disabled = false, onShowFeedback }: BusinessTypeSelectorProps) {
   return (
     <div className="w-full">
-      <h2 className="text-xl sm:text-2xl font-bold text-white text-center mb-3">
-        What type of business do you run?
+      <h2 className="text-xl sm:text-2xl font-semibold text-white text-center mb-2">
+        Select your business type
       </h2>
-      <p className="text-white/70 text-sm sm:text-base text-center mb-8">
-        Choose your business type to get personalized social media content
+      <p className="text-white/60 text-sm text-center mb-8">
+        Get AI-powered social media content tailored to your industry
       </p>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
         {/* Product Business Card */}
         <button
           onClick={() => onSelect('product')}
           disabled={disabled}
-          className="group relative bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20 hover:bg-white/20 hover:border-blue-400/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group relative bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-blue-400/30 hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          
-          <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-              <span className="text-3xl sm:text-4xl">🛍️</span>
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500/30 transition-colors duration-300">
+              <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
             </div>
             
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-3">Product Business</h3>
+            <h3 className="text-base font-medium text-white mb-2">E-commerce Store</h3>
             
-            <ul className="text-white/70 text-sm sm:text-base space-y-2 text-left">
-              <li className="flex items-center gap-2">
-                <span className="text-blue-400">•</span>
-                E-commerce stores
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-blue-400">•</span>
-                Retail shops
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-blue-400">•</span>
-                Online boutiques
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-blue-400">•</span>
-                Dropshipping
-              </li>
-            </ul>
+            <p className="text-white/50 text-sm mb-4">
+              For Shopify stores and online retailers
+            </p>
             
-            <div className="mt-6 flex items-center justify-center gap-2 text-blue-400 font-medium">
-              <span>Select Product</span>
-              <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Shopify</span>
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Products</span>
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Retail</span>
+            </div>
+            
+            <div className="mt-4 text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              Get Started →
             </div>
           </div>
         </button>
@@ -67,45 +55,29 @@ export default function BusinessTypeSelector({ onSelect, disabled = false, onSho
         <button
           onClick={() => onSelect('service')}
           disabled={disabled}
-          className="group relative bg-white/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-white/20 hover:bg-white/20 hover:border-purple-400/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group relative bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-purple-400/30 hover:bg-white/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          
-          <div className="relative">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300">
-              <span className="text-3xl sm:text-4xl">✨</span>
+          <div className="flex flex-col items-center text-center">
+            <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-purple-500/30 transition-colors duration-300">
+              <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
             </div>
             
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-3">Service Business</h3>
+            <h3 className="text-base font-medium text-white mb-2">Service Business</h3>
             
-            <ul className="text-white/70 text-sm sm:text-base space-y-2 text-left">
-              <li className="flex items-center gap-2">
-                <span className="text-purple-400">•</span>
-                Salons & Spas
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-purple-400">•</span>
-                Gyms & Fitness
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-purple-400">•</span>
-                Restaurants & Cafes
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-purple-400">•</span>
-                Medical & Wellness
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-purple-400">•</span>
-                Professional Services
-              </li>
-            </ul>
+            <p className="text-white/50 text-sm mb-4">
+              For salons, restaurants, gyms & more
+            </p>
             
-            <div className="mt-6 flex items-center justify-center gap-2 text-purple-400 font-medium">
-              <span>Select Service</span>
-              <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Salon</span>
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Restaurant</span>
+              <span className="text-xs text-white/40 bg-white/5 px-2 py-1 rounded">Fitness</span>
+            </div>
+            
+            <div className="mt-4 text-purple-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              Get Started →
             </div>
           </div>
         </button>

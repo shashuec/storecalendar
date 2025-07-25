@@ -140,7 +140,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Revoke public access using database function
-    const { data: _revokeResult, error: revokeError } = await supabase
+    const { error: revokeError } = await supabase
       .rpc('revoke_public_access', {
         calendar_id: calendarId
       });

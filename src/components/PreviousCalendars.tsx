@@ -27,9 +27,11 @@ interface Calendar {
 
 interface PreviousCalendarsProps {
   className?: string;
+  compact?: boolean;
+  onCalendarClick?: (calendar: Calendar) => void;
 }
 
-export default function PreviousCalendars({ className = '' }: PreviousCalendarsProps) {
+export default function PreviousCalendars({ className = '', compact = false, onCalendarClick }: PreviousCalendarsProps) {
   const { user, getAuthHeaders } = useAuth();
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,7 +46,7 @@ export default function PreviousCalendars({ className = '' }: PreviousCalendarsP
   const [hasMore, setHasMore] = useState(false);
 
   // Fetch user's previous calendars
-  const fetchCalendars = async (page = 1, limit = pageSize) => {
+  const fetchCalendars = async (page = 1, limit = pageSize, append = false) => {
     if (!user) return;
     
     setLoading(true);
@@ -63,7 +65,13 @@ export default function PreviousCalendars({ className = '' }: PreviousCalendarsP
       }
       
       if (data.success) {
-        setCalendars(data.calendars);
+        if (append) {
+          // Append to existing calendars for load more functionality
+          setCalendars(prev => [...prev, ...data.calendars]);
+        } else {
+          // Replace calendars for pagination
+          setCalendars(data.calendars);
+        }
         setTotalCount(data.pagination.total);
         setHasMore(data.pagination.hasMore);
         setCurrentPage(page);
@@ -185,8 +193,10 @@ export default function PreviousCalendars({ className = '' }: PreviousCalendarsP
   const endItem = Math.min(currentPage * pageSize, totalCount);
 
   useEffect(() => {
-    fetchCalendars();
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Load fewer calendars for compact view
+    const initialLimit = compact ? 5 : pageSize;
+    fetchCalendars(1, initialLimit);
+  }, [user, compact]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) {
     return null;
@@ -210,9 +220,94 @@ export default function PreviousCalendars({ className = '' }: PreviousCalendarsP
   }
 
   if (calendars.length === 0 && !loading) {
-    return null; // Don't show anything if user has no calendars
+    return compact ? (
+      <div className="p-4 text-center text-white/50 text-sm">
+        No calendars created yet
+      </div>
+    ) : null;
   }
 
+  // Compact mode for dropdown
+  if (compact) {
+    return (
+      <div className={`${className}`}>
+        {loading && calendars.length === 0 ? (
+          <div className="p-4 text-center">
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto"></div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {calendars.map((calendar) => (
+              <button
+                key={calendar.id}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onCalendarClick?.(calendar);
+                }}
+                className="w-full text-left p-3 hover:bg-white/10 rounded-lg transition-all duration-200 group cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-white text-sm truncate">
+                        {calendar.storeName}
+                      </span>
+                      <span className={`px-1.5 py-0.5 text-xs rounded ${
+                        calendar.businessType === 'service' 
+                          ? 'bg-purple-500/20 text-purple-300' 
+                          : 'bg-blue-500/20 text-blue-300'
+                      }`}>
+                        {calendar.businessType === 'service' ? 'Service' : 'Product'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-white/50">
+                      <span>Week {calendar.weekNumber}</span>
+                      <span>•</span>
+                      <span>{getRelativeTime(calendar.createdAt)}</span>
+                      {calendar.isPublic && (
+                        <>
+                          <span>•</span>
+                          <span className="text-green-400">Public</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <svg className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            ))}
+            
+            {hasMore && (
+              <div className="text-center py-3 border-t border-white/10">
+                <button
+                  onClick={() => fetchCalendars(currentPage + 1, pageSize, true)}
+                  disabled={loading}
+                  className="text-xs text-white/70 hover:text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Loading...
+                    </span>
+                  ) : (
+                    `Load more (${totalCount - calendars.length} remaining)`
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Original full view
   return (
     <div className={`${className}`}>
       <div className="bg-white/10 backdrop-blur-2xl rounded-2xl sm:rounded-2xl p-4 sm:p-6 border border-white/20">

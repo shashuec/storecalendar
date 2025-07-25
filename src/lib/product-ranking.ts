@@ -30,6 +30,7 @@ export const DEFAULT_RANKING_CRITERIA: RankingCriteria[] = [
     name: 'title_quality',
     weight: 0.2, // 20% - Good titles indicate professional listings
     scoreFunction: (product) => {
+      if (!product.name) return 0; // Return 0 if no name
       const title = product.name.toLowerCase();
       let score = 50; // Base score
       
@@ -175,8 +176,8 @@ export function filterProductsByQuery(
   
   return products.filter(product => {
     return (
-      product.name.toLowerCase().includes(searchTerm) ||
-      product.description.toLowerCase().includes(searchTerm) ||
+      product.name?.toLowerCase().includes(searchTerm) ||
+      product.description?.toLowerCase().includes(searchTerm) ||
       product.product_type?.toLowerCase().includes(searchTerm) ||
       product.vendor?.toLowerCase().includes(searchTerm) ||
       product.tags?.some(tag => tag.toLowerCase().includes(searchTerm))

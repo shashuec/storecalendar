@@ -9,7 +9,7 @@ interface BusinessDetails {
 }
 
 export interface PersistedState {
-  currentStep: 'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceTone';
+  currentStep: 'businessType' | 'url' | 'auth' | 'products' | 'preferences' | 'results' | 'serviceUrl' | 'serviceSelection' | 'serviceTone';
   url: string;
   selectedProducts: string[];
   selectedCountry: CountryCode;

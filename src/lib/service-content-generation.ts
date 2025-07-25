@@ -106,6 +106,9 @@ export async function generateServiceContent(
   weekNumber: 1 | 2,
   holidays: Holiday[]
 ): Promise<WeeklyCalendar> {
+  // Log all services available vs selected
+  console.log('Service generation - All services:', business.services);
+  console.log('Service generation - Selected services count:', business.services.length);
   const dates = getNext7Days();
   const startDate = dates[0];
   const endDate = dates[6];
@@ -119,8 +122,10 @@ export async function generateServiceContent(
   // Get post types for this business category
   const postTypes = SERVICE_POST_TYPES[business.category] || SERVICE_POST_TYPES.other;
   
-  // Shuffle services to ensure variety across the week
+  // Shuffle only the selected services to ensure variety across the week
+  // Note: business.services should already contain only the selected services
   const shuffledServices = [...business.services].sort(() => 0.5 - Math.random());
+  console.log('Using services for calendar:', shuffledServices);
   
   // Generate posts for each day
   const posts: CalendarPost[] = [];
@@ -142,9 +147,11 @@ export async function generateServiceContent(
     // Create a modified business object with service context for this day
     const businessWithContext = {
       ...business,
-      services: shuffledServices,
+      services: business.services, // Use only selected services
+      allServices: shuffledServices, // For variety
       usedServices: [...usedServices], // Pass previously used services
-      selectedService // Pass the specific service for this day
+      selectedService, // Pass the specific service for this day
+      focusOnSelectedServices: true // Flag to ensure AI focuses only on selected services
     };
     
     // Generate caption using AI
@@ -169,7 +176,7 @@ export async function generateServiceContent(
       product_featured: {
         id: 'service',
         name: business.businessName,
-        description: business.services.join(', '),
+        description: `Featured service: ${selectedService || business.services[0]}`,
         price: '',
         image_url: '',
         url: business.website || ''
